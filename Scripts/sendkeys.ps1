@@ -14,6 +14,7 @@ public class User32 {
 "@
 
 # Wait for 10 seconds at the start
+# give you time to place your cursor
 Start-Sleep -Seconds 10
 
 while ($true) {
