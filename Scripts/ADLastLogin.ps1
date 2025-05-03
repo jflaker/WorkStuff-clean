@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # Import the necessary modules
 Import-Module ActiveDirectory
 Import-Module ImportExcel
