@@ -1,21 +1,14 @@
-# Get system uptime details
-$osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
-$uptime = $osInfo.LastBootUpTime
-$elapsed = (Get-Date) - $uptime
+$uptime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+$now = Get-Date
+$uptimeSpan = $now - $uptime
+$users = (Get-Process | Where-Object {$_.ProcessName -eq "explorer"}).Count # Rough estimate of interactive users
+$cpuLoad = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples.CookedValue / 100
 
-# Format current time
-$currentTime = Get-Date -Format "HH:mm:ss"
+# Generate mock load averages
+$loadAvgValues = @($cpuLoad, ($cpuLoad + (Get-Random -Minimum -0.05 -Maximum 0.05)), ($cpuLoad + (Get-Random -Minimum -0.1 -Maximum 0.1)))
+$loadAvg = "{0:N2}, {1:N2}, {2:N2}" -f $loadAvgValues[0], $loadAvgValues[1], $loadAvgValues[2]
 
-# Retrieve active user sessions, excluding background services
-$userCount = (query user 2>$null | Where-Object { $_ -match "Active" -and $_ -notmatch "services" } | Measure-Object).Count
+# Format output to resemble Linux uptime
+$output = "{0} up {1} days, {2:hh} hours, {2:mm} minutes, {3} users, load average: {4}" -f $now.ToString("hh:mm:ss tt"), $uptimeSpan.Days, $uptimeSpan, $users, $loadAvg
 
-# Construct output to mimic Linux uptime format
-$formattedUptime = "{0} up {1} days, {2}:{3}, {4} users, load average: 0.00, 0.01, 0.05" -f `
-    $currentTime, $elapsed.Days, $elapsed.Hours, $elapsed.Minutes, $userCount
-
-# Display formatted uptime
-Write-Output $formattedUptime
-
-# Pause to keep the window open
-Write-Host "`nPress any key to exit..." -NoNewline
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Output $output
