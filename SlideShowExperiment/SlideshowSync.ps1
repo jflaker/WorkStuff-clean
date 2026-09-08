@@ -25,6 +25,10 @@
 
 .EXAMPLE
     .\SlideshowSync.ps1 -SourcePath \\FILESERVER01\Slideshow\images
+
+.EXAMPLE
+    # Any folder works, local or UNC -- handy for trying it out before wiring up a share.
+    .\SlideshowSync.ps1 -SourcePath "$env:USERPROFILE\Pictures"
 #>
 [CmdletBinding()]
 param(
@@ -60,6 +64,42 @@ if (-not (Test-Path $LocalPath)) {
     New-Item -Path $LocalPath -ItemType Directory -Force | Out-Null
     Write-Log "Created local image folder $LocalPath"
 }
+
+# --- 0. Refuse to mirror ONTO a real folder. -------------------------------------
+# robocopy /MIR deletes anything in the destination that is not in the source. If
+# -LocalPath were ever pointed at a folder that holds real files -- Pictures, say,
+# or the same folder as the source -- this would erase them. The destination is a
+# disposable cache; it must never be somewhere anyone keeps anything.
+if ([string]::IsNullOrWhiteSpace($LocalPath)) {
+    Write-Log '-LocalPath is empty. Refusing to run.' 'ERROR'
+    exit 1
+}
+try { $resolvedLocal = [IO.Path]::GetFullPath($LocalPath).TrimEnd('\') }
+catch {
+    Write-Log "-LocalPath '$LocalPath' is not a usable path: $($_.Exception.Message)" 'ERROR'
+    exit 1
+}
+$protected = @(
+    [Environment]::GetFolderPath('MyPictures')
+    [Environment]::GetFolderPath('MyDocuments')
+    [Environment]::GetFolderPath('Desktop')
+    [Environment]::GetFolderPath('MyVideos')
+    [Environment]::GetFolderPath('MyMusic')
+    [Environment]::GetFolderPath('UserProfile')
+) | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') }
+
+if ($protected -contains $resolvedLocal) {
+    Write-Log "REFUSING to run: -LocalPath '$resolvedLocal' is a real user folder. robocopy /MIR would delete files there. Point -LocalPath at a disposable cache folder such as .\images." 'ERROR'
+    exit 1
+}
+
+try {
+    $resolvedSource = [IO.Path]::GetFullPath($SourcePath).TrimEnd('\')
+    if ($resolvedSource -eq $resolvedLocal) {
+        Write-Log "REFUSING to run: source and destination are the same folder ('$resolvedLocal')." 'ERROR'
+        exit 1
+    }
+} catch { }   # UNC paths that GetFullPath dislikes are fine to skip here
 
 # --- 1. Is the share reachable? If not, leave everything alone. -----------------
 if (-not (Test-Path $SourcePath)) {
