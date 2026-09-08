@@ -1,5 +1,42 @@
 # Reset-ADPassword.ps1
 
+function Get-RandomPassword {
+    <#
+        Cryptographically random password with at least one character from each class.
+        Ambiguous characters (I l 1 O 0) are excluded so it can be read aloud safely.
+    #>
+    [CmdletBinding()]
+    param([int]$Length = 16)
+
+    $sets = @(
+        'ABCDEFGHJKLMNPQRSTUVWXYZ',   # no I, O
+        'abcdefghijkmnopqrstuvwxyz',  # no l
+        '23456789',                   # no 0, 1
+        '!#$%&*+-=?@'
+    )
+    $all = -join $sets
+
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        function Get-Char([string]$pool) {
+            $bytes = [byte[]]::new(4)
+            $rng.GetBytes($bytes)
+            $value = [BitConverter]::ToUInt32($bytes, 0)
+            $pool[[int]($value % [uint32]$pool.Length)]
+        }
+
+        # One from each class first, so complexity rules are always satisfied.
+        $chars = foreach ($set in $sets) { Get-Char $set }
+        $chars += for ($i = $sets.Count; $i -lt $Length; $i++) { Get-Char $all }
+
+        # Shuffle so the guaranteed characters are not always in the same positions.
+        $shuffled = $chars | Sort-Object { $b = [byte[]]::new(4); $rng.GetBytes($b); [BitConverter]::ToUInt32($b, 0) }
+        -join $shuffled
+    }
+    finally { $rng.Dispose() }
+}
+
+
 # Create menu options
 $options = @{
     1 = "Reset password and unlock account"
@@ -35,8 +72,10 @@ if ($userInput -eq "1") {
 if ($option -eq "1") {
     # Reset password and unlock account
     # Generate a unique random temp password per reset -- never a fixed, guessable value.
-    Add-Type -AssemblyName System.Web
-    $tempPassword   = [System.Web.Security.Membership]::GeneratePassword(16, 4)
+    # Uses System.Security.Cryptography, which works on BOTH Windows PowerShell 5.1 and
+    # PowerShell 7+. (System.Web.Security.Membership is .NET Framework only and throws
+    # on PowerShell 7.)
+    $tempPassword   = Get-RandomPassword -Length 16
     $securePassword = ConvertTo-SecureString $tempPassword -AsPlainText -Force
     Set-ADAccountPassword -Identity $userName -NewPassword $securePassword -Reset -PassThru | Set-ADUser -ChangePasswordAtLogon $true
     Unlock-ADAccount -Identity $userName

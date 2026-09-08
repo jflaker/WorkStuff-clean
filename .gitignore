@@ -1,7 +1,19 @@
+# Windows Explorer cruft
 desktop.ini
 Thumbs.db
 *.url
+
+# Generated reports -- these contain real account names, machine names and AD data.
+# Never commit them. Scripts here write to Documents\ADReports by default.
+*.xlsx
+*.xls
+*.csv
+!Scripts/drives.csv
+
+# Local / environment-specific data
 drives.local.csv
 santas.csv
 *.local.ps1
+
+# Output
 *.log

@@ -1,39 +1,59 @@
-#!/usr/bin/env pwsh
+#Requires -Modules ActiveDirectory, ImportExcel
+<#
+.SYNOPSIS
+    Exports AD users and computers with their last-logon times to an Excel workbook.
 
-# Import the necessary modules
-Import-Module ActiveDirectory
-Import-Module ImportExcel
+.DESCRIPTION
+    Output is written OUTSIDE this repository by default. This report contains real
+    account names and machine names -- do not commit it to source control.
 
-# Define the Excel file path
-$excelFilePath = Join-Path $PSScriptRoot "UserComputer.xlsx"
+    Note on accuracy: LastLogonTimestamp only replicates every ~9-14 days, so values
+    can lag reality by up to two weeks. Fine for stale-account triage; do not use it
+    to prove exactly when someone last signed in.
 
-# Get all AD users
-$users = Get-ADUser -Filter * -Property GivenName,Surname,SamAccountName,LastLogonTimestamp |
-    Select-Object GivenName,Surname,SamAccountName,@{Name='LastLogonTimestamp';Expression={
-        if ($_.LastLogonTimestamp) { [datetime]::FromFileTime($_.LastLogonTimestamp) } else { "Never Logged On" }
-    }} |
-    Sort-Object LastLogonTimestamp
+.EXAMPLE
+    .\ADLastLogin.ps1
+.EXAMPLE
+    .\ADLastLogin.ps1 -OutputFolder D:\Reports
+#>
+[CmdletBinding()]
+param(
+    # Defaults to Documents\ADReports -- deliberately not $PSScriptRoot.
+    [string]$OutputFolder = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'ADReports')
+)
 
-# Output user information to console for debugging
-Write-Host "Users Retrieved:" ($users | Format-Table -AutoSize | Out-String)
+if (-not (Test-Path $OutputFolder)) {
+    New-Item -Path $OutputFolder -ItemType Directory -Force | Out-Null
+}
 
-# Get all AD computers
-$computers = Get-ADComputer -Filter * -Property Name,Description,LastLogonTimestamp |
-    Select-Object Name,Description,@{Name='LastLogonTimestamp';Expression={
-        if ($_.LastLogonTimestamp) { [datetime]::FromFileTime($_.LastLogonTimestamp) } else { "Never Logged On" }
-    }} |
-    Sort-Object LastLogonTimestamp
+$stamp         = Get-Date -Format 'yyyyMMdd_HHmmss'
+$excelFilePath = Join-Path $OutputFolder "UserComputer_$stamp.xlsx"
 
-# Output computer information to console for debugging
-Write-Host "Computers Retrieved:" ($computers | Format-Table -AutoSize | Out-String)
+# Convert a raw LastLogonTimestamp to a sortable DateTime, or $null if never used.
+$toDate = { if ($_.LastLogonTimestamp) { [datetime]::FromFileTime($_.LastLogonTimestamp) } else { $null } }
 
-# Create or replace the Excel file
-Remove-Item $excelFilePath -ErrorAction Ignore
+Write-Verbose 'Retrieving users...'
+$users = Get-ADUser -Filter * -Properties GivenName,Surname,SamAccountName,LastLogonTimestamp |
+    Select-Object GivenName,Surname,SamAccountName,
+        @{Name='LastLogon'; Expression=$toDate} |
+    # Sort on the real DateTime (nulls first) so we never compare a date to a string.
+    Sort-Object @{Expression={ if ($null -eq $_.LastLogon) { [datetime]::MinValue } else { $_.LastLogon } }} |
+    Select-Object GivenName,Surname,SamAccountName,
+        @{Name='LastLogon'; Expression={ if ($_.LastLogon) { $_.LastLogon } else { 'Never Logged On' } }}
 
-# Export USERS data to Excel
-$users | Export-Excel -Path $excelFilePath -WorksheetName "USERS"
+Write-Verbose 'Retrieving computers...'
+$computers = Get-ADComputer -Filter * -Properties Name,Description,LastLogonTimestamp |
+    Select-Object Name,Description,
+        @{Name='LastLogon'; Expression=$toDate} |
+    Sort-Object @{Expression={ if ($null -eq $_.LastLogon) { [datetime]::MinValue } else { $_.LastLogon } }} |
+    Select-Object Name,Description,
+        @{Name='LastLogon'; Expression={ if ($_.LastLogon) { $_.LastLogon } else { 'Never Logged On' } }}
 
-# Export COMPUTERS data to Excel
-$computers | Export-Excel -Path $excelFilePath -WorksheetName "COMPUTERS" -Append
+Write-Host "Users retrieved:     $($users.Count)"
+Write-Host "Computers retrieved: $($computers.Count)"
 
-Write-Host "Excel file created/replaced successfully at $excelFilePath"
+$users     | Export-Excel -Path $excelFilePath -WorksheetName 'USERS'     -AutoSize -BoldTopRow -FreezeTopRow
+$computers | Export-Excel -Path $excelFilePath -WorksheetName 'COMPUTERS' -AutoSize -BoldTopRow -FreezeTopRow
+
+Write-Host "Report written to $excelFilePath" -ForegroundColor Green
+Write-Warning 'This file contains real account and machine names. Do not commit it to source control.'
