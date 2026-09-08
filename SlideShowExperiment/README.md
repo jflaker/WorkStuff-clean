@@ -51,6 +51,25 @@ needed `python -m http.server` on port 80.
 To change the interval, re-run the installer with `-IntervalMinutes 10`.
 To remove everything: `.\Install-DisplayBoard.ps1 -Uninstall`.
 
+## Trying it out before wiring up a share
+
+`-SourcePath` takes any folder, local or UNC. To see it working without touching a
+file server, point it at your own pictures:
+
+```powershell
+.\SlideshowSync.ps1 -SourcePath "$env:USERPROFILE\Pictures"
+start .\slideshow.html
+```
+
+Add or delete a picture in that folder, re-run the sync, and the open page picks it up
+within `POLL_MINUTES` without reloading.
+
+> **`-LocalPath` is a disposable cache, not a place to keep anything.** robocopy `/MIR`
+> deletes whatever is in the destination but not in the source. The script refuses to
+> run if `-LocalPath` resolves to Pictures, Documents, Desktop, Videos, Music or your
+> profile root, or if it matches the source — but keep the default (`.\images`) and the
+> question never comes up.
+
 ## Behaviour worth knowing
 
 | Situation | What happens |
