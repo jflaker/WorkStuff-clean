@@ -86,9 +86,11 @@ Clear-Host
 # refill the image_list.json file for the slide show
 
 # This is where the images are from
-$uncPath = "\\REDACTED-HOST\c$\Users\REDACTED-HOST\Desktop\SlideShowExperiment\images"  # UNC path
+# Point this at a purpose-made file share, NOT an admin share (C$).
+$uncPath = $env:SLIDESHOW_SOURCE
+if (-not $uncPath) { $uncPath = "\\FILESERVER01\Slideshow\images" }
 # This is where we are copying the images to for use in the slide show
-$localPath = "C:\Users\REDACTED-HOST\Desktop\SlideShowExperiment"  # Local path for JSON
+$localPath = $PSScriptRoot  # resolves to wherever this script lives
 # The file types I am looking for
 $imageExtensions = @(
     ".jpg", ".jpeg", ".png", ".gif", ".tiff", ".tif", ".bmp", ".webp",

@@ -1,6 +1,6 @@
-﻿$csvPath = "C:\Users\REDACTED-HOST\Desktop\Scripts\drives.csv"
+$csvPath = Join-Path $PSScriptRoot "drives.csv"
 $drives = Import-Csv -Path $csvPath
-#$credential = Get-Credential
+$credential = Get-Credential
 Clear-Host
 
 foreach ($drive in $drives) {

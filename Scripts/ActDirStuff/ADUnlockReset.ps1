@@ -34,12 +34,17 @@ if ($userInput -eq "1") {
 
 if ($option -eq "1") {
     # Reset password and unlock account
-    $securePassword = ConvertTo-SecureString "***REMOVED-CREDENTIAL***" -AsPlainText -Force
+    # Generate a unique random temp password per reset -- never a fixed, guessable value.
+    Add-Type -AssemblyName System.Web
+    $tempPassword   = [System.Web.Security.Membership]::GeneratePassword(16, 4)
+    $securePassword = ConvertTo-SecureString $tempPassword -AsPlainText -Force
     Set-ADAccountPassword -Identity $userName -NewPassword $securePassword -Reset -PassThru | Set-ADUser -ChangePasswordAtLogon $true
     Unlock-ADAccount -Identity $userName
 
     Write-Host ""
-    Write-Host "Password for user $userName has been reset to '***REMOVED-CREDENTIAL***' and the account has been unlocked."
+    Write-Host "Account for user $userName has been unlocked and the password reset."
+    Write-Host "Temporary password (shown once -- deliver out of band, do not email): $tempPassword" -ForegroundColor Yellow
+    Write-Host "The user must change it at next logon."
 } elseif ($option -eq "2") {
     # Unlock account only
     Unlock-ADAccount -Identity $userName
