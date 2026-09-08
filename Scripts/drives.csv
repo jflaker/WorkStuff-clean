@@ -1,4 +1,4 @@
-﻿DriveLetter,NetworkPath
-R:,\\REDACTED-DC\ShareName
-S:,\\REDACTED-FS\ShareName
-T:,\\REDACTED-FS\ShareName\SubFolder
+DriveLetter,NetworkPath
+R:,\\FILESERVER01\ShareName
+S:,\\FILESERVER02\ShareName
+T:,\\FILESERVER02\ShareName\SubFolder
