@@ -1,61 +1,94 @@
-#!/usr/bin/env pwsh
+#Requires -Modules ActiveDirectory, ImportExcel
+<#
+.SYNOPSIS
+    Reports AD users and computers that have not logged on in N days.
 
-# Importing the ImportExcel module
-Import-Module -Name ImportExcel
+.DESCRIPTION
+    FIXED: the previous version called Get-ADUser/Get-ADComputer without
+    -Properties LastLogonDate. That property is not returned by default, so every
+    object's value was $null, the comparison never matched, and the script silently
+    reported zero inactive objects on every run while appearing to succeed.
 
-# Setting the threshold for inactive users and computers
-$threshold = (Get-Date).AddDays(-90)
+    Output is written OUTSIDE this repository -- it contains real account names.
 
-# Retrieving all user objects from Active Directory
-$users = Get-ADUser -Filter *
-# Retrieving all computer objects from Active Directory
-$computers = Get-ADComputer -Filter *
+.EXAMPLE
+    .\ADOldUsersComp.ps1
+.EXAMPLE
+    .\ADOldUsersComp.ps1 -Days 180 -MailTo it@example.com -SmtpServer smtp.example.com
+#>
+[CmdletBinding()]
+param(
+    [int]$Days = 90,
+    [string]$OutputFolder = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'ADReports'),
+    # Email is opt-in. Leave these unset to just write the file.
+    [string]$MailTo,
+    [string]$MailFrom,
+    [string]$SmtpServer
+)
 
-# Defining arrays to store inactive users and computers
-$inactiveUsers = @()
-$inactiveComputers = @()
+$threshold = (Get-Date).AddDays(-$Days)
 
-# Looping through each user object
-foreach ($user in $users) {
-    # Checking the last logon date of the user object
-    if ([bool]($user.LastLogonDate -ne $null -and $user.LastLogonDate -lt $threshold)) {
-        $inactiveUsers += [PSCustomObject]@{
-            ObjectName = $user.Name
-            ObjectType = "User"
-            LastLogon = $user.LastLogonDate
-        }
+# -Properties LastLogonDate is REQUIRED -- this is the bug that made the old version
+# silently report nothing.
+$users     = Get-ADUser     -Filter * -Properties LastLogonDate
+$computers = Get-ADComputer -Filter * -Properties LastLogonDate
+
+$inactiveUsers = $users | Where-Object {
+    $null -ne $_.LastLogonDate -and $_.LastLogonDate -lt $threshold
+} | ForEach-Object {
+    [PSCustomObject]@{
+        ObjectName = $_.Name
+        ObjectType = 'User'
+        LastLogon  = $_.LastLogonDate
+        DaysStale  = [int]((Get-Date) - $_.LastLogonDate).TotalDays
+        DeleteYN   = 'N'
     }
-}
+} | Sort-Object LastLogon
 
-# Looping through each computer object
-foreach ($computer in $computers) {
-    # Checking the last logon date of the computer object
-    if ([bool]($computer.LastLogonDate -ne $null -and $computer.LastLogonDate -lt $threshold)) {
-        $inactiveComputers += [PSCustomObject]@{
-            ObjectName = $computer.Name
-            ObjectType = "Computer"
-            LastLogon = $computer.LastLogonDate
-        }
+$inactiveComputers = $computers | Where-Object {
+    $null -ne $_.LastLogonDate -and $_.LastLogonDate -lt $threshold
+} | ForEach-Object {
+    [PSCustomObject]@{
+        ObjectName = $_.Name
+        ObjectType = 'Computer'
+        LastLogon  = $_.LastLogonDate
+        DaysStale  = [int]((Get-Date) - $_.LastLogonDate).TotalDays
+        DeleteYN   = 'N'
     }
+} | Sort-Object LastLogon
+
+# Objects that have NEVER logged on are reported separately -- a null LastLogonDate is
+# not the same as "inactive", and lumping them together hides freshly created accounts.
+$neverUsers = @($users     | Where-Object { $null -eq $_.LastLogonDate }).Count
+$neverComps = @($computers | Where-Object { $null -eq $_.LastLogonDate }).Count
+
+Write-Host "Inactive users (>$Days days):     $(@($inactiveUsers).Count)"
+Write-Host "Inactive computers (>$Days days): $(@($inactiveComputers).Count)"
+Write-Host "Never logged on:                  $neverUsers users, $neverComps computers"
+
+if (@($inactiveUsers).Count -eq 0 -and @($inactiveComputers).Count -eq 0) {
+    Write-Host 'Nothing inactive found. No report written.' -ForegroundColor Green
+    return
 }
 
-# Adding the "DeleteYN" column
-$inactiveUsers = $inactiveUsers | Select-Object *,@{Name="DeleteYN";Expression={"N"}}
-$inactiveComputers = $inactiveComputers | Select-Object *,@{Name="DeleteYN";Expression={"N"}}
+if (-not (Test-Path $OutputFolder)) { New-Item -Path $OutputFolder -ItemType Directory -Force | Out-Null }
+$excelPath = Join-Path $OutputFolder "InactiveObjects_$(Get-Date -Format 'yyyyMMdd_HHmmss').xlsx"
 
-# Creating a hashtable with the sheet names and inactive objects data
-$data = @{
-    "Inactive Users" = $inactiveUsers
-    "Inactive Computers" = $inactiveComputers
-}
+# One Export-Excel call per sheet. The old version passed $data.Keys (an ARRAY) into
+# -WorksheetName, which takes a single string -- it could never produce two sheets.
+if (@($inactiveUsers).Count     -gt 0) { $inactiveUsers     | Export-Excel -Path $excelPath -WorksheetName 'Inactive Users'     -AutoSize -BoldTopRow -FreezeTopRow }
+if (@($inactiveComputers).Count -gt 0) { $inactiveComputers | Export-Excel -Path $excelPath -WorksheetName 'Inactive Computers' -AutoSize -BoldTopRow -FreezeTopRow }
 
-# If there are inactive users or computers, writing them to an Excel workbook and emailing it to admin@example.com
-if ($inactiveUsers.Count -gt 0 -or $inactiveComputers.Count -gt 0) {
-    # Creating an Excel workbook with the inactive objects
-    $excelPath = "C:\InactiveObjects.xlsx"
-    $data | Export-Excel -Path $excelPath -AutoSize -WorksheetName $($data.Keys) -BoldTopRow
+Write-Host "Report written to $excelPath" -ForegroundColor Green
+Write-Warning 'This file contains real account and machine names. Do not commit it to source control.'
 
-    # Emailing the Excel workbook to admin@example.com
-    $emailBody = "The following users and/or computers have not connected to Active Directory in more than 90 days."
-    Send-MailMessage -To "admin@example.com" -Subject "Inactive Objects Report" -Body $emailBody -Attachment $excelPath -SmtpServer "smtp.example.com"
+if ($MailTo -and $MailFrom -and $SmtpServer) {
+    # Send-MailMessage is obsolete and cannot guarantee a secure connection.
+    # Replace with Microsoft Graph or Mailozaurr when convenient.
+    Write-Warning 'Send-MailMessage is deprecated by Microsoft; sending anyway.'
+    $body = "The attached objects have not connected to Active Directory in more than $Days days."
+    Send-MailMessage -To $MailTo -From $MailFrom -SmtpServer $SmtpServer `
+        -Subject 'Inactive Objects Report' -Body $body -Attachments $excelPath
+} else {
+    Write-Host 'Email not sent (pass -MailTo, -MailFrom and -SmtpServer to enable).' -ForegroundColor DarkGray
 }

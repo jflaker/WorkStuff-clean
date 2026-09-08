@@ -1,51 +1,98 @@
-#!/usr/bin/env pwsh
+#Requires -Modules ActiveDirectory
+<#
+.SYNOPSIS
+    Finds domain computers up more than N days and optionally reboots the idle ones.
 
+.DESCRIPTION
+    FIXED: the previous version read LastInputTime from Win32_ComputerSystem. That
+    property does not exist on that class, so $lastInput was always $null and
+    New-TimeSpan -Start $null threw -- no machine ever reached the reboot.
 
-# Importing Active Directory module
-Import-Module ActiveDirectory
+    True per-session idle time needs GetLastInputInfo, which is a P/Invoke inside the
+    interactive session and is not reachable via CIM from another machine. So the gate
+    here is "no interactive user logged on", which is the honest remotely-checkable
+    equivalent. If you need real idle time, enable PS Remoting and run a
+    GetLastInputInfo probe with Invoke-Command.
 
-# Retrieving all computer objects from Active Directory
-$computers = Get-ADComputer -Filter *
+    Defaults to -WhatIf behaviour: it will NOT reboot anything unless you pass
+    -Confirm:$false explicitly.
 
-# Looping through each computer object
+.EXAMPLE
+    .\reboot30days.ps1                        # report only
+.EXAMPLE
+    .\reboot30days.ps1 -Confirm:$false        # actually reboot
+#>
+[CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+param(
+    [int]$UptimeDays = 30,
+    [string]$OutputFolder = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'ADReports'),
+    # Only act inside the maintenance window (weeknights after 6pm, or any time at weekends).
+    [switch]$IgnoreSchedule
+)
+
+function Test-MaintenanceWindow {
+    $now = Get-Date
+    if ($now.DayOfWeek -in 'Saturday','Sunday') { return $true }
+    return ($now.Hour -ge 18)
+}
+
+if (-not $IgnoreSchedule -and -not (Test-MaintenanceWindow)) {
+    Write-Host 'Outside the maintenance window (weeknights after 18:00, or weekends).' -ForegroundColor Yellow
+    Write-Host 'Pass -IgnoreSchedule to run anyway.'
+    return
+}
+
+if (-not (Test-Path $OutputFolder)) { New-Item -Path $OutputFolder -ItemType Directory -Force | Out-Null }
+# Fresh log per run, WITH a header. The old version appended headerless rows forever,
+# so Import-Csv mis-parsed it and it grew without bound.
+$logPath = Join-Path $OutputFolder "RebootScheduleLog_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
+
+$unreachable = [System.Collections.Generic.List[object]]::new()
+$rebooted    = [System.Collections.Generic.List[object]]::new()
+
+$computers = Get-ADComputer -Filter * -Properties Name
+
 foreach ($computer in $computers) {
-    # Checking if the computer is up and running
-    if (Test-Connection -ComputerName $computer.Name -Count 1 -Quiet) {
-        # Retrieving the uptime of the computer
-        $uptime = (Get-WmiObject -ComputerName $computer.Name -Class Win32_OperatingSystem |
-                   Select-Object @{Name = "Uptime"; Expression = {((Get-Date) - $_.LastBootUpTime)}}).Uptime
-        # Converting uptime to days
-        $uptimeDays = $uptime.TotalDays
+    $name = $computer.Name
 
-        # Checking if uptime is greater than 30 days
-        if ($uptimeDays -gt 30) {
-            # Checking if current time is after 6 PM on a weekday or anytime on the weekend
-            $currentDayOfWeek = (Get-Date).DayOfWeek
-            if (($currentDayOfWeek -ne "Saturday" -and $currentDayOfWeek -ne "Sunday" -and (Get-Date).Hour -ge 18) `
-                 -or ($currentDayOfWeek -eq "Saturday" -or $currentDayOfWeek -eq "Sunday")) {
-                # Checking if the computer is idle for at least 45 minutes or not logged into
-                $isIdle = (Get-CimInstance -ComputerName $computer.Name Win32_ComputerSystem | 
-                           Select-Object -ExpandProperty UserName) -eq $null
-                if ($isIdle) {
-                    $lastInput = (Get-CimInstance -ComputerName $computer.Name -Class Win32_ComputerSystem |
-                                  Select-Object -ExpandProperty LastInputTime)
-                    $idleTime = (New-TimeSpan -Start $lastInput)
-                    if ($idleTime.TotalMinutes -ge 45) {
-                        # Scheduling a reboot of the computer
-                        Restart-Computer -ComputerName $computer.Name -Force
-                    }
-                }
-            }
+    if (-not (Test-Connection -ComputerName $name -Count 1 -Quiet -ErrorAction SilentlyContinue)) {
+        $unreachable.Add([PSCustomObject]@{ ComputerName = $name; Reason = 'Not responding to ping' })
+        continue
+    }
+
+    try {
+        # Get-CimInstance, not Get-WmiObject -- the latter is removed in PowerShell 7.
+        $os = Get-CimInstance -ComputerName $name -ClassName Win32_OperatingSystem -ErrorAction Stop
+        $cs = Get-CimInstance -ComputerName $name -ClassName Win32_ComputerSystem  -ErrorAction Stop
+    }
+    catch {
+        $unreachable.Add([PSCustomObject]@{ ComputerName = $name; Reason = "CIM query failed: $($_.Exception.Message)" })
+        continue
+    }
+
+    $uptimeDays = ((Get-Date) - $os.LastBootUpTime).TotalDays
+    if ($uptimeDays -le $UptimeDays) { continue }
+
+    if ($null -ne $cs.UserName) {
+        Write-Verbose "$name is up $([int]$uptimeDays) days but $($cs.UserName) is logged on - skipping."
+        continue
+    }
+
+    if ($PSCmdlet.ShouldProcess($name, "Reboot (up $([int]$uptimeDays) days, no user logged on)")) {
+        try {
+            Restart-Computer -ComputerName $name -Force -ErrorAction Stop
+            $rebooted.Add([PSCustomObject]@{ ComputerName = $name; UptimeDays = [int]$uptimeDays })
         }
-    } else {
-        # Writing to a spreadsheet with the reason why the computer could not be contacted
-        $reason = "The computer is not responding"
-        Add-Content -Path "C:\RebootScheduleLog.csv" -Value "$($computer.Name),$($reason)"
+        catch {
+            $unreachable.Add([PSCustomObject]@{ ComputerName = $name; Reason = "Reboot failed: $($_.Exception.Message)" })
+        }
     }
 }
 
-# Checking if the spreadsheet has at least 1 entry, and emailing it to admin@example.com
-if ((Import-Csv -Path "C:\RebootScheduleLog.csv").Count -ge 1) {
-    $emailBody = "There are issues scheduling reboots on some computers in Active Directory. Please check the attached log file."
-    Send-MailMessage -To "admin@example.com" -Subject "Reboot Schedule Log" -Body $emailBody -Attachment "C:\RebootScheduleLog.csv" -SmtpServer "smtp.example.com"
+Write-Host "Rebooted:    $($rebooted.Count)"
+Write-Host "Unreachable: $($unreachable.Count)"
+
+if ($unreachable.Count -gt 0) {
+    $unreachable | Export-Csv -Path $logPath -NoTypeInformation
+    Write-Host "Problem list written to $logPath" -ForegroundColor Yellow
 }
