@@ -17,3 +17,8 @@ santas.csv
 
 # Output
 *.log
+
+# Display board runtime artifacts
+SlideShowExperiment/playlist.js
+SlideShowExperiment/sync.log
+SlideShowExperiment/images/

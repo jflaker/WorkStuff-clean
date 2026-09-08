@@ -1,160 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta http-equiv="refresh" content="900"> <!-- Refresh every 15 minutes -->
-	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta charset="UTF-8">
+<title>Display Board</title>
+<!--
+  Runs straight from file:// -- no web server needed.
 
-<meta http-equiv="Pragma" content="no-cache" />
+  playlist.js is loaded with a plain <script src> tag, which works from file://
+  (fetch() does not, which is the only reason the previous version needed
+  python -m http.server on port 80).
 
-<meta http-equiv="Expires" content="0" /> 
-
-
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Slideshow</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-            margin: 0;
-            font-family: Arial, sans-serif;
-        }
-        #slideshow-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            max-width: 100vw;
-            max-height: 100vh;
-            background-color: #fff;
-            overflow: hidden;
-        }
-        .slide {
-            display: none;
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            transition: opacity 1s;
-        }
-        .slide img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* Ensures the image covers the container without distortion */
-        }
-        .message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-            color: #333;
-        }
-        .fade {
-            animation: fade 1s;
-        }
-        .slide-right {
-            animation: slideRight 1s;
-        }
-        .slide-left {
-            animation: slideLeft 1s;
-        }
-        @keyframes fade {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes slideRight {
-            from { transform: translateX(-100%); }
-            to { transform: translateX(0); }
-        }
-        @keyframes slideLeft {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-    </style>
+  To pick up changes the page re-injects playlist.js with a cache-busting query
+  string every POLL_MINUTES and compares the signature. If it changed, the new
+  images are preloaded first and swapped in at the next slide boundary -- the
+  board never reloads, so there is no flash and no "Show starting shortly" gap.
+-->
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; }
+  body { cursor:none; }                        /* kiosk: hide the pointer */
+  #stage { position:fixed; inset:0; }
+  .layer {
+    position:absolute; inset:0;
+    background-position:center; background-repeat:no-repeat; background-size:contain;
+    opacity:0; transition:opacity 1.2s ease-in-out;
+  }
+  .layer.visible { opacity:1; }
+  #msg {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#666; font:300 2.5vw system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    text-align:center; padding:5vw;
+  }
+  #msg[hidden] { display:none; }
+</style>
 </head>
 <body>
-    <div id="slideshow-container">
-        <div class="message" id="message">Loading...</div>
-    </div>
+  <div id="stage"><div class="layer" id="layerA"></div><div class="layer" id="layerB"></div></div>
+  <div id="msg">Starting up&hellip;</div>
 
-    <script>
-        const jsonFilePath = 'image_list.json'; // Path to your JSON file
-        const slideshowContainer = document.getElementById('slideshow-container');
-        const messageElement = document.getElementById('message');
-        let images = [];
-        let currentSlide = 0;
-        let revolutions = 0;
-        const maxRevolutions = 10;
-        const transitions = ['fade', 'slide-right', 'slide-left'];
+<script src="playlist.js"></script>
+<script>
+(function () {
+  'use strict';
 
-        async function fetchImages() {
-            try {
-                const response = await fetch(jsonFilePath);
-                if (!response.ok) throw new Error('Failed to load JSON file');
-                const data = await response.json();
-                return data.map(img => img.Name);
-            } catch (error) {
-                console.error(error);
-                return [];
-            }
-        }
+  var SLIDE_SECONDS = 8;    // how long each image is shown
+  var POLL_MINUTES  = 5;    // how often to check playlist.js for changes
 
-        function showMessage(msg) {
-            messageElement.textContent = msg;
-            messageElement.style.display = 'block';
-        }
+  var layers  = [document.getElementById('layerA'), document.getElementById('layerB')];
+  var msg     = document.getElementById('msg');
+  var front   = 0;          // index into layers[] currently visible
+  var images  = [];         // current playlist
+  var pending = null;       // a newer playlist, preloaded and waiting for a boundary
+  var index   = 0;
+  var signature = null;
+  var timer = null;
 
-        function hideMessage() {
-            messageElement.style.display = 'none';
-        }
+  function showMessage(text) { msg.textContent = text; msg.hidden = false; }
+  function hideMessage()     { msg.hidden = true; }
 
-        function displaySlide(index) {
-            const slides = document.querySelectorAll('.slide');
-            slides.forEach(slide => slide.style.display = 'none');
-            const transitionClass = transitions[Math.floor(Math.random() * transitions.length)];
-            slides[index].style.display = 'block';
-            slides[index].classList.add(transitionClass);
-        }
+  // Resolve when every image has loaded or failed. Failures are dropped so one bad
+  // file cannot blank the board or wedge the rotation.
+  function preload(list) {
+    return Promise.all(list.map(function (src) {
+      return new Promise(function (resolve) {
+        var img = new Image();
+        img.onload  = function () { resolve(src); };
+        img.onerror = function () { console.warn('Skipping unreadable image: ' + src); resolve(null); };
+        img.src = src;
+      });
+    })).then(function (results) {
+      return results.filter(Boolean);
+    });
+  }
 
-        function createSlides() {
-            slideshowContainer.innerHTML = images.map(img => `
-                <div class="slide">
-                    <img src="${img}" alt="Slideshow Image">
-                </div>
-            `).join('');
-        }
+  function step() {
+    // Swap in a newer playlist only at a boundary, so it is never mid-transition.
+    if (pending) {
+      images = pending.images;
+      signature = pending.signature;
+      pending = null;
+      index = 0;
+      console.log('Playlist updated: ' + images.length + ' image(s).');
+    }
 
-        async function startSlideshow() {
-            images = await fetchImages();
-            if (images.length === 0) {
-                showMessage('Show starting shortly');
-                setTimeout(startSlideshow, 3000); // Retry every 3 seconds
-                return;
-            }
+    if (!images.length) { showMessage('No images available'); return; }
+    hideMessage();
 
-            hideMessage();
-            createSlides();
-            displaySlide(currentSlide);
+    var next = (front + 1) % 2;
+    layers[next].style.backgroundImage = 'url("' + images[index] + '")';
+    layers[next].classList.add('visible');
+    layers[front].classList.remove('visible');
+    front = next;
 
-            setInterval(() => {
-                const slides = document.querySelectorAll('.slide');
-                slides[currentSlide].classList.remove(...transitions); // Remove all transition classes
-                currentSlide = (currentSlide + 1) % images.length;
-                if (currentSlide === 0) {
-                    revolutions++;
-                    if (revolutions >= maxRevolutions) {
-                        window.location.reload(); // Refresh the page after 10 revolutions
-                    }
-                }
-                displaySlide(currentSlide);
-            }, 5000); // Change slide every 5 seconds
-        }
+    index = (index + 1) % images.length;
+  }
 
-        startSlideshow();
-    </script>
+  function start(list) {
+    images = list;
+    index = 0;
+    if (timer) clearInterval(timer);
+    step();
+    if (images.length > 1) timer = setInterval(step, SLIDE_SECONDS * 1000);
+  }
+
+  // Re-inject playlist.js with a cache-buster. Verified to work from file:// --
+  // the query string does not prevent the load, and the file is re-read from disk.
+  function poll() {
+    var s = document.createElement('script');
+    s.src = 'playlist.js?t=' + Date.now();
+    s.onload = function () {
+      s.remove();
+      var data = window.SLIDESHOW;
+      if (!data || data.generated === signature) return;   // nothing new
+      preload(data.images).then(function (ok) {
+        if (!ok.length) { console.warn('New playlist had no loadable images; keeping current set.'); return; }
+        pending = { images: ok, signature: data.generated };
+      });
+    };
+    s.onerror = function () { s.remove(); console.warn('playlist.js could not be re-read.'); };
+    document.head.appendChild(s);
+  }
+
+  function boot() {
+    var data = window.SLIDESHOW;
+    if (!data || !data.images || !data.images.length) {
+      showMessage('Waiting for images…');
+      setTimeout(boot, 15000);   // sync task may not have run yet
+      return;
+    }
+    signature = data.generated;
+    preload(data.images).then(function (ok) {
+      if (!ok.length) { showMessage('No readable images'); setTimeout(boot, 30000); return; }
+      start(ok);
+    });
+  }
+
+  boot();
+  setInterval(poll, POLL_MINUTES * 60 * 1000);
+})();
+</script>
 </body>
 </html>
