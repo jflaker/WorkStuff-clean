@@ -1,6 +1,6 @@
-﻿$domain = "REDACTED_DOMAIN"
-$username = "REDACTED_USER"
-$password = "***REMOVED-CREDENTIAL***"  # Make sure to replace "YourPassword" with the actual password
+﻿$domain = "DOMAIN"
+$username = "USERNAME"
+$password = "PASSWORD"  # Make sure to replace "YourPassword" with the actual password
 $regPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
 
 # Function to disable automatic login
