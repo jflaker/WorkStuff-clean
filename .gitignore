@@ -9,6 +9,7 @@ Thumbs.db
 *.xls
 *.csv
 !Scripts/drives.csv
+!Scripts/departments.csv
 
 # Local / environment-specific data
 drives.local.csv
