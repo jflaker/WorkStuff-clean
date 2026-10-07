@@ -6,88 +6,62 @@
   <title>Display Board Settings</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --text: #e7ecf3;
-      --muted: #8b9bb4;
-      --accent: #3d8bfd;
-      --border: #2a3548;
-      --ok: #3dd68c;
+      --bg: #0f1419; --panel: #1a2332; --text: #e7ecf3; --muted: #8b9bb4;
+      --accent: #3d8bfd; --border: #2a3548; --ok: #3dd68c;
       --font: "Segoe UI", system-ui, sans-serif;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.45;
-    }
+    body { margin: 0; min-height: 100vh; font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.45; }
     .wrap { max-width: 560px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
     h1 { font-size: 1.4rem; margin: 0 0 0.35rem; }
     .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem; }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.15rem 1.25rem;
-      margin-bottom: 1rem;
-    }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1.15rem 1.25rem; margin-bottom: 1rem; }
     label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.75rem 0 0.25rem; }
     label:first-child { margin-top: 0; }
-    input {
-      width: 100%;
-      padding: 0.55rem 0.7rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #121820;
-      color: var(--text);
-      font: inherit;
-    }
+    input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: #121820; color: var(--text); font: inherit; }
     input:focus { outline: 2px solid var(--accent); }
-    .hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+    .hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; }
+    .hint strong { color: var(--text); font-weight: 600; }
+    .path-box { margin-top: 0.5rem; padding: 0.55rem 0.7rem; background: #121820; border: 1px dashed var(--border); border-radius: 8px; font-size: 0.8rem; color: var(--muted); word-break: break-all; }
+    .path-box code { color: var(--ok); font-size: 0.85em; }
     .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
-    button {
-      appearance: none; border: none; border-radius: 8px;
-      padding: 0.55rem 1rem; font: inherit; font-weight: 600;
-      cursor: pointer; background: var(--accent); color: #fff;
-    }
+    button { appearance: none; border: none; border-radius: 8px; padding: 0.55rem 1rem; font: inherit; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
     button.secondary { background: #243044; border: 1px solid var(--border); color: var(--text); }
     button:hover { filter: brightness(1.08); }
-    .msg {
-      margin-top: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 8px;
-      font-size: 0.88rem; display: none;
-    }
+    .msg { margin-top: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 8px; font-size: 0.88rem; display: none; }
     .msg.show { display: block; }
     .msg.ok { background: rgba(61,214,140,0.12); color: var(--ok); border: 1px solid rgba(61,214,140,0.35); }
-    .msg.info { background: rgba(61,139,253,0.12); color: #9ec1ff; border: 1px solid rgba(61,139,253,0.35); }
     .msg.warn { background: rgba(255,193,7,0.1); color: #ffd666; border: 1px solid rgba(255,193,7,0.3); }
     code { background: #121820; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
     ol { margin: 0.5rem 0 0; padding-left: 1.2rem; color: var(--muted); font-size: 0.88rem; }
+    table.examples { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.5rem; }
+    table.examples th, table.examples td { text-align: left; padding: 0.35rem 0.4rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    table.examples th { color: var(--muted); font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Display Board Settings</h1>
-    <p class="sub">Edit the UNC path and timings. Saves a <code>config.json</code> file for the PowerShell sync scripts.</p>
+    <p class="sub">Set the network folder and timings. You do <strong>not</strong> need to double every backslash yourself.</p>
 
     <div class="card">
-      <label for="sourcePath">Image source (UNC path)</label>
-      <input id="sourcePath" type="text" placeholder="\\FILESERVER01\Slideshow\images" spellcheck="false" />
-      <p class="hint">Folder on the network where staff drop or delete pictures.</p>
+      <label for="sourcePath">Image source (network folder)</label>
+      <input id="sourcePath" type="text" placeholder="\\FILESERVER01\Slideshow\images" spellcheck="false" autocomplete="off" />
+      <p class="hint">
+        Type it the <strong>normal Windows way</strong>: two backslashes, then server, then folders.<br>
+        Example: <code>\\FILESERVER01\Slideshow\images</code>
+      </p>
+      <div class="path-box" id="pathPreview">Windows path: <code>—</code></div>
 
       <label for="localPath">Local cache folder</label>
       <input id="localPath" type="text" value="images" spellcheck="false" />
-      <p class="hint">Relative to the SlideShowExperiment folder. Disposable — robocopy /MIR mirrors the share here.</p>
+      <p class="hint">Usually just <code>images</code> (next to these scripts). Not a network path.</p>
 
       <label for="syncIntervalMinutes">Sync every (minutes)</label>
       <input id="syncIntervalMinutes" type="number" min="1" max="1440" value="15" />
-      <p class="hint">How often the display PC pulls from the share (scheduled task).</p>
 
       <label for="pollMinutes">Playlist check every (minutes)</label>
       <input id="pollMinutes" type="number" min="1" max="120" value="5" />
-      <p class="hint">How often the open slideshow page re-reads the local playlist.</p>
 
       <label for="slideSeconds">Seconds per slide</label>
       <input id="slideSeconds" type="number" min="1" max="600" value="8" />
@@ -101,20 +75,40 @@
     </div>
 
     <div class="card">
+      <strong>About backslashes</strong>
+      <p class="hint" style="margin-top:0.5rem">
+        In Windows you use <code>\\server\share\folder</code>.
+        Inside a JSON file each <code>\</code> must be written twice, so it looks like
+        <code>"\\\\server\\share\\folder"</code>.
+        <strong>This page does that conversion for you</strong> when you Save or Download.
+      </p>
+      <table class="examples">
+        <thead><tr><th>What you type here</th><th>What ends up in config.json</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>\\FILESERVER01\Slideshow\images</code></td>
+            <td><code>"\\\\FILESERVER01\\Slideshow\\images"</code></td>
+          </tr>
+          <tr>
+            <td><code>//FILESERVER01/Slideshow/images</code> (also OK)</td>
+            <td>converted to the same JSON form</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
       <strong>After saving</strong>
       <ol>
-        <li>Put <code>config.json</code> in the <code>SlideShowExperiment</code> folder on the display PC (overwrite the old one).</li>
-        <li>On that PC, run: <code>.\Apply-Config.ps1 -TriggerSync</code></li>
-        <li>That updates the scheduled-task interval, writes <code>config.js</code>, and runs one sync.</li>
+        <li>Put <code>config.json</code> in the <code>SlideShowExperiment</code> folder on the display PC.</li>
+        <li>On that PC run: <code>.\Apply-Config.ps1 -TriggerSync</code></li>
       </ol>
-      <p class="hint" style="margin-top:0.75rem">Chrome/Edge can save directly with “Save config.json…” (File System Access). Other browsers: use Download, then copy the file into place.</p>
     </div>
   </div>
 
   <script>
 (function () {
   'use strict';
-
   var defaults = {
     sourcePath: '\\\\FILESERVER01\\Slideshow\\images',
     localPath: 'images',
@@ -123,66 +117,75 @@
     slideSeconds: 8,
     extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
   };
-
   var $ = function (id) { return document.getElementById(id); };
   var msg = $('msg');
-
   function show(text, kind) {
     msg.textContent = text;
     msg.className = 'msg show ' + (kind || 'info');
   }
-
+  function normalizePath(raw) {
+    var p = (raw || '').trim();
+    if (!p) return '';
+    if (p.indexOf('//') === 0 && p.indexOf('://') === -1) {
+      p = '\\\\' + p.slice(2).replace(/\//g, '\\');
+    }
+    var lead = 0;
+    while (lead < p.length && p.charAt(lead) === '\\') lead++;
+    if (lead >= 4) p = '\\\\' + p.slice(lead);
+    return p;
+  }
   function formToConfig() {
     return {
-      sourcePath: $('sourcePath').value.trim(),
-      localPath: $('localPath').value.trim() || 'images',
+      sourcePath: normalizePath($('sourcePath').value),
+      localPath: ($('localPath').value.trim() || 'images'),
       syncIntervalMinutes: Math.max(1, parseInt($('syncIntervalMinutes').value, 10) || 15),
       pollMinutes: Math.max(1, parseInt($('pollMinutes').value, 10) || 5),
       slideSeconds: Math.max(1, parseInt($('slideSeconds').value, 10) || 8),
       extensions: defaults.extensions.slice()
     };
   }
-
   function configToForm(cfg) {
     $('sourcePath').value = cfg.sourcePath || '';
     $('localPath').value = cfg.localPath || 'images';
     $('syncIntervalMinutes').value = cfg.syncIntervalMinutes || 15;
     $('pollMinutes').value = cfg.pollMinutes || 5;
     $('slideSeconds').value = cfg.slideSeconds || 8;
+    updatePreview();
   }
-
-  function pretty(cfg) {
-    return JSON.stringify(cfg, null, 2) + '\n';
+  function pretty(cfg) { return JSON.stringify(cfg, null, 2) + '\n'; }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"');
   }
-
-  if (window.SLIDESHOW_CONFIG) {
-    configToForm(window.SLIDESHOW_CONFIG);
-  } else {
-    configToForm(defaults);
+  function updatePreview() {
+    var cfg = formToConfig();
+    var win = cfg.sourcePath || '—';
+    var inJson = cfg.sourcePath ? JSON.stringify(cfg.sourcePath) : '—';
+    $('pathPreview').innerHTML =
+      'Windows path: <code>' + escapeHtml(win) + '</code><br>' +
+      'In the JSON file it will look like: <code>' + escapeHtml(inJson) + '</code>';
   }
-
+  if (window.SLIDESHOW_CONFIG) configToForm(window.SLIDESHOW_CONFIG);
+  else configToForm(defaults);
   var s = document.createElement('script');
   s.src = 'config.js?t=' + Date.now();
-  s.onload = function () {
-    if (window.SLIDESHOW_CONFIG) configToForm(window.SLIDESHOW_CONFIG);
-  };
+  s.onload = function () { if (window.SLIDESHOW_CONFIG) configToForm(window.SLIDESHOW_CONFIG); };
   document.head.appendChild(s);
-
+  $('sourcePath').addEventListener('input', updatePreview);
+  updatePreview();
   $('downloadBtn').addEventListener('click', function () {
     var cfg = formToConfig();
-    if (!cfg.sourcePath) { show('Enter a source path (UNC folder).', 'warn'); return; }
+    if (!cfg.sourcePath) { show('Enter a network folder path, e.g. \\\\FILESERVER01\\Slideshow\\images', 'warn'); return; }
     var blob = new Blob([pretty(cfg)], { type: 'application/json;charset=utf-8' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'config.json';
     a.click();
     URL.revokeObjectURL(a.href);
-    show('Downloaded config.json — copy it into the SlideShowExperiment folder, then run Apply-Config.ps1.', 'ok');
+    show('Downloaded config.json. Copy into SlideShowExperiment, then run Apply-Config.ps1.', 'ok');
   });
-
   $('saveBtn').addEventListener('click', async function () {
     var cfg = formToConfig();
-    if (!cfg.sourcePath) { show('Enter a source path (UNC folder).', 'warn'); return; }
+    if (!cfg.sourcePath) { show('Enter a network folder path.', 'warn'); return; }
     if (window.showSaveFilePicker) {
       try {
         var handle = await window.showSaveFilePicker({
@@ -196,13 +199,12 @@
         return;
       } catch (e) {
         if (e.name === 'AbortError') return;
-        show('Save cancelled or failed: ' + e.message + ' — try Download instead.', 'warn');
+        show('Save failed — try Download instead.', 'warn');
         return;
       }
     }
     $('downloadBtn').click();
   });
-
   $('loadBtn').addEventListener('click', async function () {
     if (window.showOpenFilePicker) {
       try {
@@ -211,9 +213,7 @@
           multiple: false
         });
         var file = await handles[0].getFile();
-        var text = await file.text();
-        var cfg = JSON.parse(text);
-        configToForm(cfg);
+        configToForm(JSON.parse(await file.text()));
         show('Loaded ' + file.name, 'ok');
         return;
       } catch (e) {
@@ -230,12 +230,8 @@
       if (!f) return;
       var reader = new FileReader();
       reader.onload = function () {
-        try {
-          configToForm(JSON.parse(String(reader.result)));
-          show('Loaded ' + f.name, 'ok');
-        } catch (err) {
-          show('Invalid JSON: ' + err.message, 'warn');
-        }
+        try { configToForm(JSON.parse(String(reader.result))); show('Loaded ' + f.name, 'ok'); }
+        catch (err) { show('Invalid JSON: ' + err.message, 'warn'); }
       };
       reader.readAsText(f);
     };
