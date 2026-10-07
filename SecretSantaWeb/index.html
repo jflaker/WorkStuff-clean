@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Secret Santa</title>
+  <style>
+    :root {
+      --bg: #0f1a14;
+      --panel: #1a2e24;
+      --panel2: #243d32;
+      --text: #e8f0ea;
+      --muted: #8fa899;
+      --accent: #c41e3a;
+      --accent2: #2d8a4e;
+      --gold: #d4a017;
+      --border: #2f4a3c;
+      --danger: #e85d5d;
+      --radius: 12px;
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      background:
+        radial-gradient(ellipse at 20% 0%, #1a3d2a 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, #3d1a1a 0%, transparent 45%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 1.75rem;
+    }
+    header h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.85rem;
+      letter-spacing: 0.02em;
+    }
+    header h1 span { color: var(--accent); }
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .card h2 {
+      margin: 0 0 0.85rem;
+      font-size: 1.05rem;
+      color: var(--gold);
+      font-weight: 600;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel2);
+      color: var(--text);
+      font: inherit;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid var(--accent2);
+      outline-offset: 1px;
+    }
+    .row {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .row > * { flex: 1; min-width: 120px; }
+    .row .grow { flex: 2; }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    button, .btn {
+      appearance: none;
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 1rem;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent2);
+      color: #fff;
+    }
+    button:hover, .btn:hover { filter: brightness(1.08); }
+    button.secondary {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    button.danger { background: var(--accent); }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.45rem 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .empty {
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 0.5rem 0;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      background: var(--panel2);
+      color: var(--muted);
+    }
+    .msg {
+      margin-top: 0.65rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .msg.show { display: block; }
+    .msg.error { background: rgba(232, 93, 93, 0.15); color: #ffb4b4; border: 1px solid rgba(232,93,93,0.35); }
+    .msg.ok { background: rgba(45, 138, 78, 0.15); color: #a8e0b8; border: 1px solid rgba(45,138,78,0.35); }
+    .msg.info { background: rgba(212, 160, 23, 0.12); color: #e8d48a; border: 1px solid rgba(212,160,23,0.3); }
+    .pair-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .pair-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.55rem 0.65rem;
+      margin-bottom: 0.35rem;
+      background: var(--panel2);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .pair-list .arrow { color: var(--gold); margin: 0 0.5rem; }
+    .reveal-box {
+      text-align: center;
+      padding: 1.25rem;
+      background: var(--panel2);
+      border-radius: var(--radius);
+      border: 1px dashed var(--border);
+      min-height: 100px;
+    }
+    .reveal-box .big {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--gold);
+      margin-top: 0.5rem;
+    }
+    .hidden { display: none !important; }
+    footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--danger);
+      padding: 0.25rem 0.4rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.35rem;
+      margin-bottom: 0.85rem;
+    }
+    .tabs button {
+      flex: 1;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .tabs button.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1><span>Secret</span> Santa</h1>
+      <p>Standalone · works offline · nothing leaves this browser</p>
+    </header>
+
+    <!-- Participants -->
+    <section class="card">
+      <h2>1. Participants <span class="badge" id="countBadge">0</span></h2>
+      <div class="row">
+        <div class="grow">
+          <label for="nameIn">Name</label>
+          <input id="nameIn" type="text" placeholder="Alice" autocomplete="off" />
+        </div>
+        <div class="grow">
+          <label for="emailIn">Email (optional)</label>
+          <input id="emailIn" type="email" placeholder="alice@example.com" autocomplete="off" />
+        </div>
+        <div style="flex:0">
+          <label>&nbsp;</label>
+          <button type="button" id="addBtn">Add</button>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="secondary" id="importBtn">Import CSV</button>
+        <button type="button" class="secondary" id="exportCsvBtn">Export CSV</button>
+        <button type="button" class="secondary danger" id="clearBtn">Clear all</button>
+        <input type="file" id="fileIn" accept=".csv,text/csv" class="hidden" />
+      </div>
+      <div id="listArea" style="margin-top:0.85rem">
+        <p class="empty" id="emptyMsg">No one yet. Add at least 2 people.</p>
+        <table id="peopleTable" class="hidden">
+          <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
+          <tbody id="peopleBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Exclusions -->
+    <section class="card">
+      <h2>2. Exclusions <span class="badge">optional</span></h2>
+      <p style="margin:0 0 0.75rem;color:var(--muted);font-size:0.88rem">
+        People who must not draw each other (e.g. partners). Mutual.
+      </p>
+      <div class="row">
+        <div>
+          <label for="exA">Person A</label>
+          <select id="exA"></select>
+        </div>
+        <div>
+          <label for="exB">Person B</label>
+          <select id="exB"></select>
+        </div>
+        <div style="flex:0">
+          <label>&nbsp;</label>
+          <button type="button" class="secondary" id="addExBtn">Add exclusion</button>
+        </div>
+      </div>
+      <ul class="pair-list" id="exList" style="margin-top:0.75rem"></ul>
+    </section>
+
+    <!-- Draw -->
+    <section class="card">
+      <h2>3. Draw</h2>
+      <div class="btn-row">
+        <button type="button" id="drawBtn" disabled>Draw names</button>
+        <button type="button" class="secondary" id="redrawBtn" disabled>Draw again</button>
+      </div>
+      <div class="msg" id="drawMsg"></div>
+    </section>
+
+    <!-- Results -->
+    <section class="card hidden" id="resultsCard">
+      <h2>4. Results</h2>
+      <div class="tabs">
+        <button type="button" class="active" data-tab="reveal" id="tabReveal">Private reveal</button>
+        <button type="button" data-tab="full" id="tabFull">Full list (organizer)</button>
+      </div>
+
+      <div id="panelReveal">
+        <p style="margin:0 0 0.75rem;color:var(--muted);font-size:0.88rem">
+          Hand the device around. Each person picks their name — only their assignment is shown.
+        </p>
+        <label for="revealWho">I am…</label>
+        <select id="revealWho" style="margin-bottom:0.75rem"></select>
+        <div class="reveal-box" id="revealBox">
+          <span style="color:var(--muted)">Choose your name above</span>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="hideRevealBtn">Hide again</button>
+        </div>
+      </div>
+
+      <div id="panelFull" class="hidden">
+        <ul class="pair-list" id="fullList"></ul>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="downloadBtn">Download .txt</button>
+          <button type="button" class="secondary" id="copyBtn">Copy to clipboard</button>
+        </div>
+      </div>
+    </section>
+
+    <footer>All data stays in this tab. Refreshing the page clears everything.</footer>
+  </div>
+
+  <script>
+(function () {
+  'use strict';
+
+  /** @type {{name: string, email: string}[]} */
+  let people = [];
+  /** @type {[string, string][]} */
+  let exclusions = [];
+  /** @type {{giver: string, receiver: string}[]|null} */
+  let pairs = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  function showMsg(el, text, kind) {
+    el.textContent = text;
+    el.className = 'msg show ' + (kind || 'info');
+  }
+  function hideMsg(el) {
+    el.className = 'msg';
+    el.textContent = '';
+  }
+
+  function cryptoShuffle(arr) {
+    const a = arr.slice();
+    const buf = new Uint32Array(a.length);
+    crypto.getRandomValues(buf);
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = buf[i] % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function isExcluded(a, b) {
+    return exclusions.some(([x, y]) =>
+      (x === a && y === b) || (x === b && y === a)
+    );
+  }
+
+  /**
+   * Derangement with optional mutual exclusions.
+   * Returns map giverName -> receiverName or null.
+   */
+  function drawPairs(names, maxAttempts) {
+    maxAttempts = maxAttempts || 2000;
+    const n = names.length;
+    if (n < 2) return null;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const receivers = cryptoShuffle(names);
+      let ok = true;
+      for (let i = 0; i < n; i++) {
+        if (names[i] === receivers[i] || isExcluded(names[i], receivers[i])) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) {
+        return names.map((g, i) => ({ giver: g, receiver: receivers[i] }));
+      }
+    }
+    return null;
+  }
+
+  function renderPeople() {
+    $('countBadge').textContent = String(people.length);
+    const body = $('peopleBody');
+    body.innerHTML = '';
+    if (people.length === 0) {
+      $('emptyMsg').classList.remove('hidden');
+      $('peopleTable').classList.add('hidden');
+    } else {
+      $('emptyMsg').classList.add('hidden');
+      $('peopleTable').classList.remove('hidden');
+      people.forEach((p, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(p.name) + '</td>' +
+          '<td>' + escapeHtml(p.email || '—') + '</td>' +
+          '<td><button type="button" class="icon-btn" data-i="' + i + '" title="Remove">✕</button></td>';
+        body.appendChild(tr);
+      });
+      body.querySelectorAll('.icon-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const i = +btn.getAttribute('data-i');
+          const removed = people[i].name;
+          people.splice(i, 1);
+          exclusions = exclusions.filter(([a, b]) => a !== removed && b !== removed);
+          pairs = null;
+          renderAll();
+        });
+      });
+    }
+    $('drawBtn').disabled = people.length < 2;
+    $('redrawBtn').disabled = !pairs;
+    fillSelects();
+  }
+
+  function fillSelects() {
+    const opts = people.map((p) =>
+      '<option value="' + escapeAttr(p.name) + '">' + escapeHtml(p.name) + '</option>'
+    ).join('');
+    $('exA').innerHTML = opts;
+    $('exB').innerHTML = opts;
+    if (people.length >= 2) $('exB').selectedIndex = Math.min(1, people.length - 1);
+
+    const reveal = $('revealWho');
+    const prev = reveal.value;
+    reveal.innerHTML = '<option value="">— select —</option>' + opts;
+    if (prev && people.some((p) => p.name === prev)) reveal.value = prev;
+  }
+
+  function renderExclusions() {
+    const ul = $('exList');
+    ul.innerHTML = '';
+    exclusions.forEach(([a, b], i) => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        '<span>' + escapeHtml(a) + ' <span class="arrow">↔</span> ' + escapeHtml(b) + '</span>' +
+        '<button type="button" class="icon-btn" data-i="' + i + '">✕</button>';
+      ul.appendChild(li);
+    });
+    ul.querySelectorAll('.icon-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        exclusions.splice(+btn.getAttribute('data-i'), 1);
+        pairs = null;
+        renderAll();
+      });
+    });
+  }
+
+  function renderResults() {
+    const card = $('resultsCard');
+    if (!pairs) {
+      card.classList.add('hidden');
+      return;
+    }
+    card.classList.remove('hidden');
+    const ul = $('fullList');
+    ul.innerHTML = '';
+    pairs.forEach((p) => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        '<span><strong>' + escapeHtml(p.giver) + '</strong>' +
+        '<span class="arrow">→</span>' + escapeHtml(p.receiver) + '</span>';
+      ul.appendChild(li);
+    });
+    updateReveal();
+  }
+
+  function updateReveal() {
+    const who = $('revealWho').value;
+    const box = $('revealBox');
+    if (!who || !pairs) {
+      box.innerHTML = '<span style="color:var(--muted)">Choose your name above</span>';
+      return;
+    }
+    const hit = pairs.find((p) => p.giver === who);
+    if (!hit) {
+      box.innerHTML = '<span style="color:var(--muted)">Not found</span>';
+      return;
+    }
+    box.innerHTML =
+      '<div>You are Secret Santa for</div>' +
+      '<div class="big">' + escapeHtml(hit.receiver) + '</div>';
+  }
+
+  function renderAll() {
+    renderPeople();
+    renderExclusions();
+    renderResults();
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/'/g, '&#39;');
+  }
+
+  function addPerson() {
+    const name = $('nameIn').value.trim();
+    const email = $('emailIn').value.trim();
+    if (!name) {
+      $('nameIn').focus();
+      return;
+    }
+    if (people.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+      alert('That name is already on the list.');
+      return;
+    }
+    people.push({ name, email });
+    $('nameIn').value = '';
+    $('emailIn').value = '';
+    $('nameIn').focus();
+    pairs = null;
+    renderAll();
+  }
+
+  function doDraw() {
+    hideMsg($('drawMsg'));
+    const names = people.map((p) => p.name);
+    const result = drawPairs(names);
+    if (!result) {
+      showMsg(
+        $('drawMsg'),
+        'Could not find a valid draw (too many exclusions?). Try removing some exclusions or add more people.',
+        'error'
+      );
+      pairs = null;
+      renderResults();
+      return;
+    }
+    pairs = result;
+    showMsg($('drawMsg'), 'Draw complete — ' + pairs.length + ' assignments.', 'ok');
+    $('redrawBtn').disabled = false;
+    renderResults();
+    document.getElementById('tabReveal').click();
+  }
+
+  function assignmentsText() {
+    if (!pairs) return '';
+    const lines = [
+      'Secret Santa assignments',
+      'Generated: ' + new Date().toISOString(),
+      '',
+      ...pairs.map((p) => p.giver + ' -> ' + p.receiver),
+      '',
+      'Keep this private.'
+    ];
+    return lines.join('\n');
+  }
+
+  function parseCsv(text) {
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
+    if (!lines.length) return [];
+    const split = (line) => {
+      const out = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (c === ',' && !inQ) {
+          out.push(cur); cur = '';
+        } else cur += c;
+      }
+      out.push(cur);
+      return out.map((s) => s.trim());
+    };
+    let start = 0;
+    let cols = split(lines[0]).map((c) => c.toLowerCase());
+    let nameIdx = cols.indexOf('name');
+    let emailIdx = cols.indexOf('email');
+    if (nameIdx >= 0) start = 1;
+    else { nameIdx = 0; emailIdx = 1; }
+
+    const result = [];
+    for (let i = start; i < lines.length; i++) {
+      const cells = split(lines[i]);
+      const name = (cells[nameIdx] || '').trim();
+      if (!name) continue;
+      const email = emailIdx >= 0 ? (cells[emailIdx] || '').trim() : '';
+      result.push({ name, email });
+    }
+    return result;
+  }
+
+  // Events
+  $('addBtn').addEventListener('click', addPerson);
+  $('nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
+  $('emailIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') addPerson(); });
+
+  $('clearBtn').addEventListener('click', () => {
+    if (!people.length) return;
+    if (!confirm('Remove everyone and clear the draw?')) return;
+    people = [];
+    exclusions = [];
+    pairs = null;
+    hideMsg($('drawMsg'));
+    renderAll();
+  });
+
+  $('addExBtn').addEventListener('click', () => {
+    const a = $('exA').value;
+    const b = $('exB').value;
+    if (!a || !b || a === b) {
+      alert('Pick two different people.');
+      return;
+    }
+    if (isExcluded(a, b)) return;
+    exclusions.push([a, b]);
+    pairs = null;
+    renderAll();
+  });
+
+  $('drawBtn').addEventListener('click', doDraw);
+  $('redrawBtn').addEventListener('click', doDraw);
+
+  $('revealWho').addEventListener('change', updateReveal);
+  $('hideRevealBtn').addEventListener('click', () => {
+    $('revealWho').value = '';
+    updateReveal();
+  });
+
+  document.querySelectorAll('.tabs button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tabs button').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.getAttribute('data-tab');
+      $('panelReveal').classList.toggle('hidden', tab !== 'reveal');
+      $('panelFull').classList.toggle('hidden', tab !== 'full');
+    });
+  });
+
+  $('downloadBtn').addEventListener('click', () => {
+    const blob = new Blob([assignmentsText()], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'secret-santa-assignments.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $('copyBtn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(assignmentsText());
+      showMsg($('drawMsg'), 'Copied full list to clipboard.', 'ok');
+    } catch {
+      showMsg($('drawMsg'), 'Could not copy (browser blocked clipboard).', 'error');
+    }
+  });
+
+  $('importBtn').addEventListener('click', () => $('fileIn').click());
+  $('fileIn').addEventListener('change', () => {
+    const file = $('fileIn').files && $('fileIn').files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const rows = parseCsv(String(reader.result || ''));
+        if (!rows.length) {
+          alert('No people found in that CSV.');
+          return;
+        }
+        const seen = new Set(people.map((p) => p.name.toLowerCase()));
+        let added = 0;
+        rows.forEach((r) => {
+          const key = r.name.toLowerCase();
+          if (seen.has(key)) return;
+          seen.add(key);
+          people.push(r);
+          added++;
+        });
+        pairs = null;
+        renderAll();
+        showMsg($('drawMsg'), 'Imported ' + added + ' participant(s).', 'ok');
+      } catch (err) {
+        alert('Import failed: ' + err.message);
+      }
+      $('fileIn').value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  $('exportCsvBtn').addEventListener('click', () => {
+    const lines = ['Name,Email'];
+    people.forEach((p) => {
+      const n = /[",\n]/.test(p.name) ? '"' + p.name.replace(/"/g, '""') + '"' : p.name;
+      const e = /[",\n]/.test(p.email) ? '"' + p.email.replace(/"/g, '""') + '"' : p.email;
+      lines.push(n + ',' + e);
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'santas.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  renderAll();
+})();
+  </script>
+</body>
+</html>
