@@ -4,59 +4,113 @@
     Syncs display-board images from a network share and regenerates the playlist.
 
 .DESCRIPTION
-    Run by Task Scheduler at boot and every N minutes. Nobody should ever run this
-    by hand -- that was the flaw in the previous version (SlideshowPrep.ps1), which
-    had to be run manually, so the board kept reloading the same stale list forever
-    while looking like it was working.
+    Run by Task Scheduler at boot and every N minutes (interval from config.json).
 
-    Design notes:
+    Drop or delete image files in the UNC folder; this script mirrors them locally
+    with robocopy /MIR and rewrites playlist.js only when the set actually changed.
+    slideshow.html polls playlist.js and picks up updates without a full page reload.
 
-    * robocopy /MIR, not delete-then-copy. The old script deleted every local image
-      first, which left a window where the folder was empty (blank board if the page
-      reloaded mid-run) and re-copied everything on every pass. /MIR adds, updates
-      and removes in one go and only transfers what actually changed.
+    Configuration (in order of precedence):
+      1. -SourcePath / -LocalPath parameters
+      2. config.json beside this script (sourcePath, localPath, extensions, ...)
+      3. Environment variable SLIDESHOW_SOURCE
 
-    * If the share is unreachable, this exits WITHOUT touching the local copy, so the
-      board keeps showing the last good set instead of going blank.
+    Also writes config.js so the browser can read poll/slide timings from file://.
 
-    * playlist.js is only rewritten when the image set actually changes (compared by
-      name + size + timestamp). The display polls that file; rewriting it every run
-      would make the board rebuild itself for no reason.
-
+.EXAMPLE
+    .\SlideshowSync.ps1
 .EXAMPLE
     .\SlideshowSync.ps1 -SourcePath \\FILESERVER01\Slideshow\images
-
-.EXAMPLE
-    # Any folder works, local or UNC -- handy for trying it out before wiring up a share.
-    .\SlideshowSync.ps1 -SourcePath "$env:USERPROFILE\Pictures"
 #>
 [CmdletBinding()]
 param(
-    # UNC path holding the images. Use a normal share, NOT an admin share (C$).
-    [string]$SourcePath = $env:SLIDESHOW_SOURCE,
-
-    # Local folder the board reads from. Defaults to .\images next to this script.
-    [string]$LocalPath = (Join-Path $PSScriptRoot 'images'),
-
+    [string]$SourcePath,
+    [string]$LocalPath,
+    [string]$ConfigPath = (Join-Path $PSScriptRoot 'config.json'),
     [string]$LogPath = (Join-Path $PSScriptRoot 'sync.log'),
-
-    [string[]]$Extensions = @('.jpg','.jpeg','.png','.gif','.bmp','.webp')
+    [string[]]$Extensions
 )
 
 function Write-Log {
     param([string]$Message, [string]$Level = 'INFO')
-    $line = "{0} [{1}] {2}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Level, $Message
+    $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Level, $Message
     Write-Host $line
     try { Add-Content -Path $LogPath -Value $line -ErrorAction SilentlyContinue } catch { }
 }
 
-# Keep the log from growing without bound.
+function Read-DisplayConfig {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try {
+        $cfg = (Get-Content -LiteralPath $Path -Raw -Encoding UTF8) | ConvertFrom-Json
+        return $cfg
+    } catch {
+        Write-Log "Could not parse config.json: $($_.Exception.Message)" 'WARN'
+        return $null
+    }
+}
+
+function Write-ConfigJs {
+    param($Cfg, [string]$OutPath)
+    $exts = @($Cfg.extensions)
+    if (-not $exts.Count) { $exts = @('.jpg','.jpeg','.png','.gif','.bmp','.webp') }
+    $extJson = ($exts | ForEach-Object { "'$_'" }) -join ', '
+    $src = ([string]$Cfg.sourcePath -replace '\\', '\\' -replace "'", "\'")
+    $local = ([string]$Cfg.localPath -replace '\\', '\\' -replace "'", "\'")
+    $syncMin = if ($Cfg.syncIntervalMinutes) { [int]$Cfg.syncIntervalMinutes } else { 15 }
+    $poll = if ($Cfg.pollMinutes) { [int]$Cfg.pollMinutes } else { 5 }
+    $slide = if ($Cfg.slideSeconds) { [int]$Cfg.slideSeconds } else { 8 }
+    $content = @"
+// AUTO-GENERATED -- edit config.json, then re-run sync or Apply-Config.ps1
+window.SLIDESHOW_CONFIG = {
+  sourcePath: '$src',
+  localPath: '$local',
+  syncIntervalMinutes: $syncMin,
+  pollMinutes: $poll,
+  slideSeconds: $slide,
+  extensions: [$extJson]
+};
+"@
+    Set-Content -LiteralPath $OutPath -Value $content -Encoding UTF8
+}
+
 if ((Test-Path $LogPath) -and ((Get-Item $LogPath).Length -gt 1MB)) {
     Set-Content -Path $LogPath -Value "--- truncated $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ---"
 }
 
+$fileCfg = Read-DisplayConfig -Path $ConfigPath
+
 if (-not $SourcePath) {
-    Write-Log 'No -SourcePath given and SLIDESHOW_SOURCE is not set. Nothing to do.' 'ERROR'
+    if ($fileCfg -and $fileCfg.sourcePath) { $SourcePath = [string]$fileCfg.sourcePath }
+    elseif ($env:SLIDESHOW_SOURCE) { $SourcePath = $env:SLIDESHOW_SOURCE }
+}
+if (-not $LocalPath) {
+    if ($fileCfg -and $fileCfg.localPath) {
+        $lp = [string]$fileCfg.localPath
+        $LocalPath = if ([IO.Path]::IsPathRooted($lp)) { $lp } else { Join-Path $PSScriptRoot $lp }
+    } else {
+        $LocalPath = Join-Path $PSScriptRoot 'images'
+    }
+}
+if (-not $Extensions -or $Extensions.Count -eq 0) {
+    if ($fileCfg -and $fileCfg.extensions) { $Extensions = @($fileCfg.extensions) }
+    else { $Extensions = @('.jpg','.jpeg','.png','.gif','.bmp','.webp') }
+}
+
+if ($fileCfg) {
+    $jsCfg = [pscustomobject]@{
+        sourcePath          = $SourcePath
+        localPath           = if ($fileCfg.localPath) { $fileCfg.localPath } else { 'images' }
+        syncIntervalMinutes = $fileCfg.syncIntervalMinutes
+        pollMinutes         = $fileCfg.pollMinutes
+        slideSeconds        = $fileCfg.slideSeconds
+        extensions          = $Extensions
+    }
+    Write-ConfigJs -Cfg $jsCfg -OutPath (Join-Path $PSScriptRoot 'config.js')
+}
+
+if (-not $SourcePath) {
+    Write-Log 'No sourcePath. Set it in config.json or pass -SourcePath.' 'ERROR'
     exit 1
 }
 
@@ -65,11 +119,6 @@ if (-not (Test-Path $LocalPath)) {
     Write-Log "Created local image folder $LocalPath"
 }
 
-# --- 0. Refuse to mirror ONTO a real folder. -------------------------------------
-# robocopy /MIR deletes anything in the destination that is not in the source. If
-# -LocalPath were ever pointed at a folder that holds real files -- Pictures, say,
-# or the same folder as the source -- this would erase them. The destination is a
-# disposable cache; it must never be somewhere anyone keeps anything.
 if ([string]::IsNullOrWhiteSpace($LocalPath)) {
     Write-Log '-LocalPath is empty. Refusing to run.' 'ERROR'
     exit 1
@@ -89,7 +138,7 @@ $protected = @(
 ) | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') }
 
 if ($protected -contains $resolvedLocal) {
-    Write-Log "REFUSING to run: -LocalPath '$resolvedLocal' is a real user folder. robocopy /MIR would delete files there. Point -LocalPath at a disposable cache folder such as .\images." 'ERROR'
+    Write-Log "REFUSING to run: -LocalPath '$resolvedLocal' is a real user folder. Point localPath at a disposable cache such as .\images." 'ERROR'
     exit 1
 }
 
@@ -99,22 +148,18 @@ try {
         Write-Log "REFUSING to run: source and destination are the same folder ('$resolvedLocal')." 'ERROR'
         exit 1
     }
-} catch { }   # UNC paths that GetFullPath dislikes are fine to skip here
+} catch { }
 
-# --- 1. Is the share reachable? If not, leave everything alone. -----------------
 if (-not (Test-Path $SourcePath)) {
     Write-Log "Source '$SourcePath' unreachable. Keeping the existing local images." 'WARN'
     exit 0
 }
 
-# --- 2. Mirror. ------------------------------------------------------------------
 $filter = $Extensions | ForEach-Object { "*$_" }
 $roboArgs = @($SourcePath, $LocalPath) + $filter + @('/MIR','/NJH','/NJS','/NP','/NDL','/R:2','/W:5')
 $roboOut = & robocopy @roboArgs 2>&1
 $rc = $LASTEXITCODE
 
-# robocopy: 0-7 are success (0 = nothing to do, 1 = files copied, 2 = extras removed...).
-# 8 and above are real failures.
 if ($rc -ge 8) {
     Write-Log "robocopy failed with exit code $rc. Local images left untouched." 'ERROR'
     $roboOut | Where-Object { $_ } | Select-Object -Last 5 | ForEach-Object { Write-Log "  $_" 'ERROR' }
@@ -122,7 +167,6 @@ if ($rc -ge 8) {
 }
 Write-Log "robocopy completed (exit $rc)."
 
-# --- 3. Has the image set actually changed? --------------------------------------
 $images = Get-ChildItem -Path $LocalPath -File |
     Where-Object { $Extensions -contains $_.Extension.ToLower() } |
     Sort-Object Name
@@ -141,12 +185,8 @@ if (Test-Path $playlistPath) {
     }
 }
 
-# --- 4. Write playlist.js --------------------------------------------------------
-# A .js file, not .json, so the display can load it with a plain <script src> tag
-# and therefore run straight from file:// -- no web server, no port 80, no CORS.
 $folderName = Split-Path $LocalPath -Leaf
 $entries = $images | ForEach-Object {
-    # Escape the filename so spaces, #, % and non-ASCII names work in an <img src>.
     "    '{0}/{1}'" -f $folderName, [uri]::EscapeDataString($_.Name)
 }
 
