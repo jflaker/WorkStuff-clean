@@ -1,6 +1,6 @@
 # Display Board
 
-Hands-off digital signage. Staff drop or delete images in a **network UNC folder**; the display PC syncs on a schedule and the slideshow picks up changes automatically.
+Hands-off digital signage. Staff drop or delete images in a **network folder**; the display PC syncs on a schedule and the slideshow picks up changes automatically.
 
 ## How it works
 
@@ -20,9 +20,25 @@ slideshow.html (Chrome kiosk, file://)
 
 ## Configure path and times
 
-### Option A — edit the file
+### Option A — settings page (easiest)
 
-Open `config.json` in any text editor:
+Open **`settings.html`** in Chrome or Edge. Type the path the normal Windows way:
+
+```text
+\\FILESERVER01\Slideshow\images
+```
+
+You do **not** need to double every `\`. Save/Download writes a correct `config.json` for you.
+
+### Option B — edit `config.json` by hand
+
+If you edit the file in Notepad, JSON needs each backslash doubled:
+
+| What you mean (Windows) | What to write inside the quotes in JSON |
+|-------------------------|----------------------------------------|
+| `\\FILESERVER01\Slideshow\images` | `"\\\\FILESERVER01\\Slideshow\\images"` |
+
+Example file:
 
 ```json
 {
@@ -35,7 +51,7 @@ Open `config.json` in any text editor:
 }
 ```
 
-Then on the display PC:
+After changing config, on the display PC:
 
 ```powershell
 .\Apply-Config.ps1 -TriggerSync
@@ -43,19 +59,10 @@ Then on the display PC:
 
 That updates the scheduled-task interval, writes `config.js`, and runs one sync.
 
-### Option B — freestanding web settings
-
-Open `settings.html` in Chrome/Edge (double-click is fine):
-
-1. Set the UNC path and intervals  
-2. **Save config.json…** (or Download)  
-3. Place that file in this folder on the display PC  
-4. Run `.\Apply-Config.ps1 -TriggerSync`
-
 ## First-time setup on a display PC
 
 1. Copy this folder to the machine, e.g. `C:\DisplayBoard`.
-2. Edit `config.json` (or use `settings.html`) so `sourcePath` is your share.
+2. Set `sourcePath` via `settings.html` or by editing `config.json`.
 3. PowerShell **as Administrator** in that folder:
 
    ```powershell
@@ -86,10 +93,10 @@ Uninstall: `.\Install-DisplayBoard.ps1 -Uninstall`.
 
 | File | Role |
 |---|---|
-| `config.json` | **You edit this** — UNC path and timings |
-| `settings.html` | Optional UI to produce/edit `config.json` |
+| `config.json` | UNC path and timings |
+| `settings.html` | Simple editor (handles `\` escaping for you) |
 | `Apply-Config.ps1` | Apply config → `config.js` + scheduled task interval |
-| `SlideshowSync.ps1` | robocopy + playlist (reads `config.json`) |
+| `SlideshowSync.ps1` | robocopy + playlist |
 | `Install-DisplayBoard.ps1` | One-time task registration |
 | `slideshow.html` | Kiosk player |
 | `config.js` / `playlist.js` | Generated — do not commit |
