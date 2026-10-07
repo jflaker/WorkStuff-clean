@@ -5,31 +5,31 @@
     One-time setup on a display-board PC: schedules the image sync and the kiosk browser.
 
 .DESCRIPTION
-    This is the piece that was missing before. The sync script itself was fine, but
-    nothing ever ran it, so the board reloaded the same stale playlist indefinitely.
+    Reads source path and sync interval from config.json (or -SourcePath / -IntervalMinutes).
 
     Creates two scheduled tasks:
-      DisplayBoard-Sync    at startup, then every N minutes -- pulls images, rewrites
-                           playlist.js only if something changed.
-      DisplayBoard-Kiosk   at logon -- opens Chrome full screen on the local HTML file.
-
-    Both run as the logged-on user ("run only when user is logged on"), which is the
-    right choice for an autologon kiosk: the task inherits that user's access to the
-    share, so no password has to be stored anywhere.
+      DisplayBoard-Sync    at logon, then every N minutes -- pulls images, rewrites playlist.js
+      DisplayBoard-Kiosk   at logon -- opens Chrome full screen on the local HTML file
 
 .EXAMPLE
-    .\Install-DisplayBoard.ps1 -SourcePath \\FILESERVER01\Slideshow\images
+    # Edit config.json first, then:
+    .\Install-DisplayBoard.ps1
 .EXAMPLE
-    .\Install-DisplayBoard.ps1 -SourcePath \\FS01\Signage -IntervalMinutes 10 -Uninstall:$false
+    .\Install-DisplayBoard.ps1 -SourcePath \\FILESERVER01\Slideshow\images -IntervalMinutes 10
+.EXAMPLE
+    .\Install-DisplayBoard.ps1 -Uninstall
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory, ParameterSetName = 'Install')]
+    [Parameter(ParameterSetName = 'Install')]
     [string]$SourcePath,
 
     [Parameter(ParameterSetName = 'Install')]
     [ValidateRange(1, 1440)]
-    [int]$IntervalMinutes = 15,
+    [int]$IntervalMinutes,
+
+    [Parameter(ParameterSetName = 'Install')]
+    [string]$ConfigPath = (Join-Path $PSScriptRoot 'config.json'),
 
     [Parameter(ParameterSetName = 'Uninstall')]
     [switch]$Uninstall
@@ -51,7 +51,56 @@ if ($Uninstall) {
     return
 }
 
-# --- sanity checks ---------------------------------------------------------------
+$fileCfg = $null
+if (Test-Path -LiteralPath $ConfigPath) {
+    try { $fileCfg = (Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8) | ConvertFrom-Json }
+    catch { Write-Warning "Could not parse config.json: $($_.Exception.Message)" }
+}
+
+if (-not $SourcePath -and $fileCfg -and $fileCfg.sourcePath) {
+    $SourcePath = [string]$fileCfg.sourcePath
+}
+if (-not $PSBoundParameters.ContainsKey('IntervalMinutes')) {
+    if ($fileCfg -and $fileCfg.syncIntervalMinutes) {
+        $IntervalMinutes = [int]$fileCfg.syncIntervalMinutes
+    } else {
+        $IntervalMinutes = 15
+    }
+}
+
+if (-not $SourcePath) {
+    throw @"
+No source path set.
+
+Edit config.json and set sourcePath to your UNC folder, e.g.:
+  \\FILESERVER01\Slideshow\images
+
+Or pass -SourcePath explicitly.
+"@
+}
+
+try {
+    $toSave = [ordered]@{
+        sourcePath          = $SourcePath
+        localPath           = if ($fileCfg -and $fileCfg.localPath) { [string]$fileCfg.localPath } else { 'images' }
+        syncIntervalMinutes = $IntervalMinutes
+        pollMinutes         = if ($fileCfg -and $fileCfg.pollMinutes) { [int]$fileCfg.pollMinutes } else { 5 }
+        slideSeconds        = if ($fileCfg -and $fileCfg.slideSeconds) { [int]$fileCfg.slideSeconds } else { 8 }
+        extensions          = if ($fileCfg -and $fileCfg.extensions) { @($fileCfg.extensions) } else {
+            @('.jpg','.jpeg','.png','.gif','.bmp','.webp')
+        }
+    }
+    ($toSave | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $ConfigPath -Encoding UTF8
+    Write-Host "Updated $ConfigPath" -ForegroundColor Green
+} catch {
+    Write-Warning "Could not write config.json: $($_.Exception.Message)"
+}
+
+$apply = Join-Path $root 'Apply-Config.ps1'
+if (Test-Path $apply) {
+    & $apply -ConfigPath $ConfigPath
+}
+
 $syncScript = Join-Path $root 'SlideshowSync.ps1'
 $page       = Join-Path $root 'slideshow.html'
 foreach ($f in $syncScript, $page) {
@@ -60,7 +109,7 @@ foreach ($f in $syncScript, $page) {
 
 if (-not (Test-Path $SourcePath)) {
     Write-Warning "Source '$SourcePath' is not reachable right now."
-    Write-Warning 'Continuing -- the sync task retries on its own schedule and leaves the board alone when the share is down.'
+    Write-Warning 'Continuing -- the sync task retries on its schedule and leaves the board alone when the share is down.'
 }
 
 $chrome = @(
@@ -73,11 +122,10 @@ if (-not $chrome) { throw 'Chrome not found. Install it, or edit this script to 
 
 $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive
 
-# --- 1. sync task ----------------------------------------------------------------
+# Task reads config.json each run -- change path later without reinstalling.
 $syncAction = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -SourcePath "{1}"' -f $syncScript, $SourcePath)
+    -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}"' -f $syncScript)
 
-# At startup, and repeating for a very long duration so it effectively never stops.
 $atStartup = New-ScheduledTaskTrigger -AtLogOn
 $repeating = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
     -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) `
@@ -92,14 +140,12 @@ if ($PSCmdlet.ShouldProcess($syncTask, "Register (every $IntervalMinutes min)"))
     Write-Host "Registered $syncTask (at logon + every $IntervalMinutes minutes)" -ForegroundColor Green
 }
 
-# --- 2. kiosk task ---------------------------------------------------------------
 $fileUrl = 'file:///' + ($page -replace '\\', '/')
 $kioskArgs = '--kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble ' +
              '--disable-features=TranslateUI --no-first-run --disable-pinch "{0}"' -f $fileUrl
 
 $kioskAction  = New-ScheduledTaskAction -Execute $chrome -Argument $kioskArgs
 $kioskTrigger = New-ScheduledTaskTrigger -AtLogOn
-# Give the sync task a head start so the first playlist exists before the browser opens.
 $kioskTrigger.Delay = 'PT30S'
 $kioskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero)
@@ -113,8 +159,12 @@ if ($PSCmdlet.ShouldProcess($kioskTask, 'Register')) {
 Write-Host ''
 Write-Host 'Setup complete.' -ForegroundColor Green
 Write-Host "  Images sync from : $SourcePath"
+Write-Host "  Interval         : every $IntervalMinutes minute(s)"
 Write-Host "  Display page     : $fileUrl"
+Write-Host "  Config file      : $ConfigPath"
 Write-Host ''
-Write-Host 'Run the first sync now with:' -ForegroundColor Cyan
+Write-Host 'Change path/timing later by editing config.json (or settings.html), then:' -ForegroundColor Cyan
+Write-Host '  .\Apply-Config.ps1 -TriggerSync'
+Write-Host ''
+Write-Host 'First sync now:' -ForegroundColor Cyan
 Write-Host "  Start-ScheduledTask -TaskName $syncTask"
-Write-Host 'Then check sync.log in this folder.'
