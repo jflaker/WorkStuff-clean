@@ -1,0 +1,8 @@
+{
+  "sourcePath": "\\\\FILESERVER01\\Slideshow\\images",
+  "localPath": "images",
+  "syncIntervalMinutes": 15,
+  "pollMinutes": 5,
+  "slideSeconds": 8,
+  "extensions": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]
+}
