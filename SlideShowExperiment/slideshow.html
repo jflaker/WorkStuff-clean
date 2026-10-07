@@ -3,21 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Display Board</title>
-<!--
-  Runs straight from file:// -- no web server needed.
-
-  playlist.js is loaded with a plain <script src> tag, which works from file://
-  (fetch() does not, which is the only reason the previous version needed
-  python -m http.server on port 80).
-
-  To pick up changes the page re-injects playlist.js with a cache-busting query
-  string every POLL_MINUTES and compares the signature. If it changed, the new
-  images are preloaded first and swapped in at the next slide boundary -- the
-  board never reloads, so there is no flash and no "Show starting shortly" gap.
--->
 <style>
   html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; }
-  body { cursor:none; }                        /* kiosk: hide the pointer */
+  body { cursor:none; }
   #stage { position:fixed; inset:0; }
   .layer {
     position:absolute; inset:0;
@@ -37,19 +25,21 @@
   <div id="stage"><div class="layer" id="layerA"></div><div class="layer" id="layerB"></div></div>
   <div id="msg">Starting up&hellip;</div>
 
+<script src="config.js"></script>
 <script src="playlist.js"></script>
 <script>
 (function () {
   'use strict';
 
-  var SLIDE_SECONDS = 8;    // how long each image is shown
-  var POLL_MINUTES  = 5;    // how often to check playlist.js for changes
+  var cfg = window.SLIDESHOW_CONFIG || {};
+  var SLIDE_SECONDS = (cfg.slideSeconds > 0) ? cfg.slideSeconds : 8;
+  var POLL_MINUTES  = (cfg.pollMinutes  > 0) ? cfg.pollMinutes  : 5;
 
   var layers  = [document.getElementById('layerA'), document.getElementById('layerB')];
   var msg     = document.getElementById('msg');
-  var front   = 0;          // index into layers[] currently visible
-  var images  = [];         // current playlist
-  var pending = null;       // a newer playlist, preloaded and waiting for a boundary
+  var front   = 0;
+  var images  = [];
+  var pending = null;
   var index   = 0;
   var signature = null;
   var timer = null;
@@ -57,8 +47,6 @@
   function showMessage(text) { msg.textContent = text; msg.hidden = false; }
   function hideMessage()     { msg.hidden = true; }
 
-  // Resolve when every image has loaded or failed. Failures are dropped so one bad
-  // file cannot blank the board or wedge the rotation.
   function preload(list) {
     return Promise.all(list.map(function (src) {
       return new Promise(function (resolve) {
@@ -73,7 +61,6 @@
   }
 
   function step() {
-    // Swap in a newer playlist only at a boundary, so it is never mid-transition.
     if (pending) {
       images = pending.images;
       signature = pending.signature;
@@ -102,15 +89,30 @@
     if (images.length > 1) timer = setInterval(step, SLIDE_SECONDS * 1000);
   }
 
-  // Re-inject playlist.js with a cache-buster. Verified to work from file:// --
-  // the query string does not prevent the load, and the file is re-read from disk.
   function poll() {
+    var c = document.createElement('script');
+    c.src = 'config.js?t=' + Date.now();
+    c.onload = function () {
+      c.remove();
+      var ncfg = window.SLIDESHOW_CONFIG || {};
+      if (ncfg.slideSeconds > 0 && ncfg.slideSeconds !== SLIDE_SECONDS) {
+        SLIDE_SECONDS = ncfg.slideSeconds;
+        if (timer) {
+          clearInterval(timer);
+          if (images.length > 1) timer = setInterval(step, SLIDE_SECONDS * 1000);
+        }
+      }
+      if (ncfg.pollMinutes > 0) POLL_MINUTES = ncfg.pollMinutes;
+    };
+    c.onerror = function () { c.remove(); };
+    document.head.appendChild(c);
+
     var s = document.createElement('script');
     s.src = 'playlist.js?t=' + Date.now();
     s.onload = function () {
       s.remove();
       var data = window.SLIDESHOW;
-      if (!data || data.generated === signature) return;   // nothing new
+      if (!data || data.generated === signature) return;
       preload(data.images).then(function (ok) {
         if (!ok.length) { console.warn('New playlist had no loadable images; keeping current set.'); return; }
         pending = { images: ok, signature: data.generated };
@@ -124,7 +126,7 @@
     var data = window.SLIDESHOW;
     if (!data || !data.images || !data.images.length) {
       showMessage('Waiting for images…');
-      setTimeout(boot, 15000);   // sync task may not have run yet
+      setTimeout(boot, 15000);
       return;
     }
     signature = data.generated;
