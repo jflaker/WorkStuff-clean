@@ -11,6 +11,7 @@ Most `.ps1` files must be run on a domain-joined Windows PC, often as Administra
 | [SecretSantaWeb](SecretSantaWeb/) | Secret Santa in the browser. No server, nothing is uploaded. | Double-click `index.html`. |
 | [Scripts](Scripts/) | PowerShell for AD, logs, updates, drives, and PC setup. | Run from an elevated PowerShell window. |
 | [bash](bash/) | One Kali example. Not used with the PowerShell scripts. | See that folder's README. |
+| [LinuxStuff](LinuxStuff/) | Linux shell scripts. Empty for now. | See that folder's README. |
 
 ## Scripts
 
