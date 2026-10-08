@@ -1,44 +1,44 @@
-# Display Board
+# Display board
 
-Hands-off digital signage. Staff drop or delete images in a **network folder**; the display PC syncs on a schedule and the slideshow picks up changes automatically.
+Lobby slideshow. Staff drop or delete pictures in a network folder. A scheduled task on the display PC copies them down, and the page picks up the new set without a reload.
 
 ## How it works
 
-```
-\\SERVER\Share\images          ← people add/remove pictures here
+```text
+\\SERVER\Share\images          people add or remove pictures here
         |
-        |  DisplayBoard-Sync task (every syncIntervalMinutes)
-        |  reads config.json → robocopy /MIR → .\images\
-        |  regenerates playlist.js only if the set changed
-        |  writes config.js (timings for the browser)
+        |  task DisplayBoard-Sync, every syncIntervalMinutes
+        |  reads config.json, robocopy /MIR into .\images\
+        |  rewrites playlist.js only when the set changed
+        |  writes config.js (slide time and poll time)
         v
-slideshow.html (Chrome kiosk, file://)
+slideshow.html                 Chrome kiosk, opened from file://
         |
         +-- re-reads playlist.js every pollMinutes
-        +-- preloads new images, swaps at a slide boundary (no flash)
+        +-- preloads new images and swaps at the next slide
 ```
 
-## Configure path and times
+No web server. `playlist.js` and `config.js` are normal script files, so the page works from `file://`.
 
-### Option A — settings page (easiest)
+## Set the path and the times
 
-Open **`settings.html`** in Chrome or Edge. Type the path the normal Windows way:
+### Settings page
+
+Open [settings.html](settings.html) in Chrome or Edge. Type the folder the normal Windows way:
 
 ```text
 \\FILESERVER01\Slideshow\images
 ```
 
-You do **not** need to double every `\`. Save/Download writes a correct `config.json` for you.
+Do not double every backslash yourself. Save or Download writes a correct `config.json`.
 
-### Option B — edit `config.json` by hand
+### Or edit config.json
 
-If you edit the file in Notepad, JSON needs each backslash doubled:
+In Notepad, each `\` inside the quotes has to be written twice.
 
-| What you mean (Windows) | What to write inside the quotes in JSON |
-|-------------------------|----------------------------------------|
+| What you mean | What the JSON file contains |
+|---|---|
 | `\\FILESERVER01\Slideshow\images` | `"\\\\FILESERVER01\\Slideshow\\images"` |
-
-Example file:
 
 ```json
 {
@@ -51,54 +51,56 @@ Example file:
 }
 ```
 
-After changing config, on the display PC:
+`syncIntervalMinutes` is how often the PC copies the share. `pollMinutes` is how often the open page looks for a new list. `slideSeconds` is how long each picture stays up.
+
+After a change, on the display PC:
 
 ```powershell
 .\Apply-Config.ps1 -TriggerSync
 ```
 
-That updates the scheduled-task interval, writes `config.js`, and runs one sync.
+That updates the scheduled task, writes `config.js`, and runs one sync.
 
-## First-time setup on a display PC
+## First-time setup
 
-1. Copy this folder to the machine, e.g. `C:\DisplayBoard`.
-2. Set `sourcePath` via `settings.html` or by editing `config.json`.
+1. Copy this folder to the PC, for example `C:\DisplayBoard`.
+2. Set `sourcePath` with `settings.html` or by editing `config.json`.
 3. PowerShell **as Administrator** in that folder:
 
    ```powershell
    .\Install-DisplayBoard.ps1
    ```
 
-4. First sync:
+4. First copy, then check the log:
 
    ```powershell
    Start-ScheduledTask -TaskName DisplayBoard-Sync
    Get-Content .\sync.log -Tail 20
    ```
 
-5. Log off/on, or `Start-ScheduledTask -TaskName DisplayBoard-Kiosk`.
+5. Log off and on, or `Start-ScheduledTask -TaskName DisplayBoard-Kiosk`.
 
-Uninstall: `.\Install-DisplayBoard.ps1 -Uninstall`.
+Remove both tasks: `.\Install-DisplayBoard.ps1 -Uninstall`.
 
-## Behaviour
+Use a normal file share, not an admin share (`C$`). `localPath` must stay a disposable cache (the default `images` folder). `robocopy /MIR` deletes anything in that folder that is not on the share.
+
+## What you should see
 
 | Situation | What happens |
 |---|---|
-| Image added/removed on the share | Picked up within `syncIntervalMinutes`, then shown within `pollMinutes`. No reload. |
-| Share unreachable | Sync exits without touching local files. Board keeps last good set. |
-| Corrupt image | Skipped; rotation continues. |
-| Nothing changed | `playlist.js` left alone. |
+| Picture added or removed on the share | Shows up within one sync, then within one poll. The page does not reload. |
+| Share unreachable | Sync stops and leaves the local copies alone. The board keeps the last good set. |
+| Bad image file | Skipped. The rest keep rotating. |
+| Nothing changed | `playlist.js` is not rewritten. |
 
 ## Files
 
 | File | Role |
 |---|---|
-| `config.json` | UNC path and timings |
-| `settings.html` | Simple editor (handles `\` escaping for you) |
-| `Apply-Config.ps1` | Apply config → `config.js` + scheduled task interval |
-| `SlideshowSync.ps1` | robocopy + playlist |
-| `Install-DisplayBoard.ps1` | One-time task registration |
-| `slideshow.html` | Kiosk player |
-| `config.js` / `playlist.js` | Generated — do not commit |
-
-Use a normal file share, **not** an admin share (`C$`).
+| `config.json` | Network path and timings. This is the file you edit. |
+| `settings.html` | Form that writes `config.json` and handles backslashes. |
+| `Apply-Config.ps1` | Push `config.json` into `config.js` and the scheduled task. |
+| `SlideshowSync.ps1` | Copy the share and rebuild the playlist. |
+| `Install-DisplayBoard.ps1` | Create the sync task and the Chrome kiosk task. Run once. |
+| `slideshow.html` | The full-screen player. |
+| `config.js`, `playlist.js`, `sync.log`, `images\` | Made on the PC. Do not commit them. |
