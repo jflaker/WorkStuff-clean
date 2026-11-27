@@ -87,7 +87,7 @@ Run from `ActiveDirectory/`. Workbooks and the reboot problem list go to `Docume
 |---|---|
 | `Connect-NetworkDrives.ps1` | Reads `drives.csv` beside the script (`DriveLetter`, `NetworkPath`), prompts once with `Get-Credential`, and creates a persistent drive for each letter that is not already present. |
 | `Move-FilesByType.ps1` | Moves files from `-SourceFolder` (default Desktop) into Pictures, Videos, Documents, or Music by extension. Skips AppData and those destination folders. A name collision becomes `name (1).ext`. `-Recurse` is off unless you pass it. `-WhatIf` prints the plan and moves nothing. |
-| `SecretSanta.ps1` | Derangement from a CSV with columns `Name` and `Email`. Every row needs a non-empty email. Default input is `santas.csv` beside the script. Writes `Documents\SecretSanta\assignments_*.txt`. Mail goes out only with `-SendEmail`, `-MailFrom`, and `-SmtpServer` (`-SmtpPort` default 25, optional `-UseSsl` and `-Credential`). `-WhatIf` skips writing the file and skips sending. |
+| `SecretSanta.ps1` | Derangement from a CSV with columns `Name` and `Email`. Email may be blank. `-SendEmail` requires a non-empty email on every row. Default input is `santas.csv` beside the script. Writes `Documents\SecretSanta\assignments_*.txt`. Mail goes out only with `-SendEmail`, `-MailFrom`, and `-SmtpServer` (`-SmtpPort` default 25, optional `-UseSsl` and `-Credential`). `-WhatIf` skips writing the file and skips sending. |
 | `MenuTesting.ps1` | Numbered menu from `%USERPROFILE%\utilityScripts.csv` (`Description`, `Path`, `Filename`, `ActiveYN`). Creates one example row when the file is missing. The chosen path is dot-sourced. This menu is separate from the other scripts in the repo. |
 | `sendkeys.ps1` | Disabled. The loop that sent `J` and Enter to the foreground window is inside a comment. The file retains the `user32.dll` P/Invoke sample. Running it does nothing. |
 
@@ -111,7 +111,7 @@ T:,\\FILESERVER02\ShareName\SubFolder
 
 Replace them on the machine where you map drives. Keep a CSV of real servers out of git (`*.csv` is ignored except the three sample files listed below).
 
-`SecretSanta.ps1` requires an email on every row. [SecretSantaWeb](SecretSantaWeb/) accepts a blank email and can also record exclusions.
+`SecretSanta.ps1` allows a blank email unless you pass `-SendEmail`, which requires one on every row. [SecretSantaWeb](SecretSantaWeb/) also accepts a blank email, and it can record exclusions. The PowerShell script has no exclusion list.
 
 ## Display board
 
@@ -132,14 +132,15 @@ Open [SecretSantaWeb/index.html](SecretSantaWeb/index.html) by double-clicking i
 
 ## Linux
 
-[Linux/clear-offline-windows-password.sh](Linux/clear-offline-windows-password.sh) runs `chntpw` against an offline SAM hive, then reboots the machine you are booted into.
+[Linux/clear-offline-windows-password.sh](Linux/clear-offline-windows-password.sh) blanks one local Windows account password in an offline SAM hive. It runs `chntpw` once (`1`, then `q`, then `y`) and does not reboot unless you pass `--reboot`. `--reboot` reboots the live Linux session you are booted into, not a remote Windows PC.
 
 ```bash
 ./clear-offline-windows-password.sh
 ./clear-offline-windows-password.sh SomeLocalUser /mnt/windows/Windows/System32/config/SAM
+./clear-offline-windows-password.sh --reboot
 ```
 
-With no arguments the account is `Administrator` and the hive path is `/Windows/System32/config/SAM`. The script invokes `chntpw` three times (no piped answer, then menu choice `1`, then `y`) and always runs `sudo reboot`. Use it on a Windows volume you are allowed to administer, from a Linux live session where that path is the offline hive. It changes a local SAM account. Active Directory passwords are untouched.
+With no username or hive path the account is `Administrator` and the hive path is `/Windows/System32/config/SAM`. Use it on a Windows volume you are allowed to administer, from a Linux live session where that path is the offline hive. It changes a local SAM account and leaves an empty password. Active Directory passwords are untouched. See [Linux/README.md](Linux/README.md) for the safety notes.
 
 ## Files that stay out of git
 
