@@ -1,5 +1,21 @@
-# Reset-ADPassword.ps1
+#Requires -Version 5.1
+#Requires -Modules ActiveDirectory
+<#
+.SYNOPSIS
+    Unlocks an Active Directory account, or resets its password and unlocks it.
 
+.DESCRIPTION
+    Interactive menu. Option 1 builds a random 16-character temporary password,
+    sets it with "change at next logon", and unlocks the account. The password
+    is printed once. Option 2 only unlocks.
+
+    Type a SamAccountName, or pick one from a list of every user in the domain.
+    The account you run this as needs the right to reset that user's password
+    and to unlock the account.
+
+.EXAMPLE
+    .\ADUnlockReset.ps1
+#>
 function Get-RandomPassword {
     <#
         Cryptographically random password with at least one character from each class.

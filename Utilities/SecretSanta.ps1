@@ -39,7 +39,7 @@
     Optional SMTP credential (Get-Credential).
 
 .EXAMPLE
-    # Preview only (safe default with -WhatIf)
+    # Print the pairs and skip writing the assignment file
     .\SecretSanta.ps1 -WhatIf
 
 .EXAMPLE
