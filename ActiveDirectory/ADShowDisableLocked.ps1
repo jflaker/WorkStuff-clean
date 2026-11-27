@@ -18,8 +18,13 @@ Import-Module ActiveDirectory
 
 Clear-Host
 
-$lockedAccounts = Search-ADAccount -LockedOut | Select-Object Name, SAMAccountName, LockedOut
-$disabledAccounts = Search-ADAccount -AccountDisabled | Select-Object Name, SAMAccountName, Enabled
+# @() around the pipeline, not around a variable. In Windows PowerShell 5.1 a
+# single Search-ADAccount result is a scalar, and .Count on that scalar is $null,
+# so one locked or disabled account was skipped. An empty pipeline inside @()
+# is Count 0. @($null) is Count 1 on 5.1, which is why this is not
+# $x = ...; $x = @($x).
+$lockedAccounts = @(Search-ADAccount -LockedOut | Select-Object Name, SAMAccountName, LockedOut)
+$disabledAccounts = @(Search-ADAccount -AccountDisabled | Select-Object Name, SAMAccountName, Enabled)
 
 if ($lockedAccounts.Count -eq 0 -and $disabledAccounts.Count -eq 0) {
     Write-Output "No locked or disabled profiles found."
