@@ -4,7 +4,7 @@ One HTML file. It runs in the browser. There is no server, no account, and nothi
 
 Open it by double-clicking [index.html](index.html).
 
-The PowerShell version, which can also write a file or send mail, is [Utilities/SecretSanta.ps1](../Utilities/SecretSanta.ps1). That script requires an Email value on every row. This page allows a blank email, and it can record exclusion pairs (two people who must not draw each other). The PowerShell script has no exclusion list.
+The PowerShell version, which can also write a file or send mail, is [Utilities/SecretSanta.ps1](../Utilities/SecretSanta.ps1). That script allows a blank Email unless you pass `-SendEmail`, which requires an email on every row. This page always allows a blank email, and it can record exclusion pairs (two people who must not draw each other). The PowerShell script has no exclusion list.
 
 ## What it does
 

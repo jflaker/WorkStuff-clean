@@ -7,6 +7,9 @@
     Reads participants from a CSV (Name, Email), produces a derangement
     (no one is assigned themselves), and writes the result to a local file.
 
+    Email may be blank when you are not sending mail, matching the browser
+    page. -SendEmail requires a non-empty email on every row.
+
     Email is OPT-IN. By default the script only shows and/or writes the pairs.
     Pass -SendEmail (and the SMTP parameters) when you are ready to notify people.
 
@@ -15,13 +18,13 @@
 
 .PARAMETER CsvPath
     Path to the participants CSV. Default: santas.csv beside this script.
-    Expected columns: Name, Email
+    Expected columns: Name, Email. Email may be empty unless -SendEmail is set.
 
 .PARAMETER OutPath
     Where to write the assignment list. Default: Documents\SecretSanta\assignments_YYYYMMDD_HHMMSS.txt
 
 .PARAMETER SendEmail
-    Actually send email. Requires -MailFrom and -SmtpServer.
+    Actually send email. Requires -MailFrom, -SmtpServer, and an email on every row.
 
 .PARAMETER MailFrom
     From address for notifications.
@@ -43,7 +46,7 @@
     .\SecretSanta.ps1 -WhatIf
 
 .EXAMPLE
-    # Write pairs to a file, do not email
+    # Write pairs to a file, do not email. Blank Email cells are allowed.
     .\SecretSanta.ps1
 
 .EXAMPLE
@@ -132,8 +135,11 @@ $participants = foreach ($row in $raw) {
     $name  = ($row.Name  -as [string]).Trim()
     $email = ($row.Email -as [string]).Trim()
     if (-not $name)  { throw 'A row has an empty Name.' }
-    if (-not $email) { throw "No Email for '$name'." }
-    if ($email -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') {
+    if (-not $email) {
+        if ($SendEmail) {
+            throw "No Email for '$name'. -SendEmail requires an email on every row."
+        }
+    } elseif ($email -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') {
         Write-Warning "Email for '$name' looks unusual: $email"
     }
     [pscustomobject]@{ Name = $name; Email = $email }
