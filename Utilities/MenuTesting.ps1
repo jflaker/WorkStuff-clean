@@ -1,4 +1,21 @@
-﻿# PowerShell Menu Script with CSV Creation
+﻿#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Numbered menu of scripts listed in a CSV under the user profile.
+
+.DESCRIPTION
+    Reads %USERPROFILE%\utilityScripts.csv. If that file is missing, writes one
+    example row that points at %USERPROFILE%\exampleScript.ps1. Only rows with
+    ActiveYN = Y are shown. Choosing a number dot-sources that script in this
+    session.
+
+    The CSV is not generated from the other tools in this repository. This file
+    is a menu experiment, separate from those tools.
+
+.EXAMPLE
+    .\MenuTesting.ps1
+#>
+# PowerShell Menu Script with CSV Creation
 # This script creates a CSV file with utility script details and allows you to execute them from a menu.
 
 function Show-Menu {

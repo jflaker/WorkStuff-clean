@@ -1,4 +1,12 @@
 <#
+.SYNOPSIS
+    Disabled. The idle-key sender is commented out and this file does not run it.
+
+.DESCRIPTION
+    The original loop sent "J" and Enter to whatever window had focus. That
+    code is kept below, inside a comment, as a user32.dll P/Invoke sample.
+    Executing this script has no effect.
+
 ===============================================================================
  DISABLED - THIS SCRIPT IS INTENTIONALLY COMMENTED OUT. DO NOT RE-ENABLE
              WITHOUT READING THIS FIRST.
