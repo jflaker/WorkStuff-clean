@@ -1,3 +1,20 @@
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Stops Chrome, Firefox, and Edge, then deletes their user-data folders.
+
+.DESCRIPTION
+    Stops processes named chrome, firefox, and msedge, then removes:
+      %LOCALAPPDATA%\Google\Chrome\User Data
+      %APPDATA%\Mozilla\Firefox\Profiles
+      %LOCALAPPDATA%\Microsoft\Edge\User Data
+
+    That is the profile store (bookmarks, extensions, saved passwords, history),
+    not history alone. The script ends with Pause and waits for a keypress.
+
+.EXAMPLE
+    .\Clear-BrowserUserData.ps1
+#>
 # Function to delete browser data folders
 function Clear-BrowserData {
     Write-Output "Clearing all Chrome, Firefox, and Edge data..."

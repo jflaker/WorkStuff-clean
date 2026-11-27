@@ -2,6 +2,15 @@
 
 Lobby slideshow. Staff drop or delete pictures in a network folder. A scheduled task on the display PC copies them down, and the page picks up the new set without a reload.
 
+## Requirements
+
+- Windows PowerShell 5.1
+- An elevated window for `Install-DisplayBoard.ps1` (it registers scheduled tasks)
+- Google Chrome for the kiosk task
+- A file share the display PC can read
+
+`config.json` in this folder is a template. `sourcePath` is `\\FILESERVER01\Slideshow\images`, a placeholder. `SlideshowSync.ps1` mirrors that share into `localPath` (default `images`) with `robocopy /MIR`, so `images` is a disposable cache.
+
 ## How it works
 
 ```text

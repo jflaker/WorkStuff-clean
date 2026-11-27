@@ -19,11 +19,11 @@
     supports -WhatIf so you can see the plan before anything moves.
 
 .EXAMPLE
-    .\movefiles.ps1 -WhatIf
+    .\Move-FilesByType.ps1 -WhatIf
 .EXAMPLE
-    .\movefiles.ps1 -SourceFolder "$env:USERPROFILE\Downloads"
+    .\Move-FilesByType.ps1 -SourceFolder "$env:USERPROFILE\Downloads"
 .EXAMPLE
-    .\movefiles.ps1 -SourceFolder "$env:USERPROFILE\Downloads" -Recurse
+    .\Move-FilesByType.ps1 -SourceFolder "$env:USERPROFILE\Downloads" -Recurse
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 param(

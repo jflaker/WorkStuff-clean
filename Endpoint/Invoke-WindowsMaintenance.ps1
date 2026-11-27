@@ -25,9 +25,9 @@
     Where to write the run transcript. Defaults to Documents\Diagnostics.
 
 .EXAMPLE
-    .\runupdates.ps1
+    .\Invoke-WindowsMaintenance.ps1
 .EXAMPLE
-    .\runupdates.ps1 -Reboot
+    .\Invoke-WindowsMaintenance.ps1 -Reboot
 #>
 [CmdletBinding()]
 param(
@@ -47,7 +47,7 @@ function Write-Section {
 # Transcript so unattended runs leave a record. Plain ASCII output only, so the log
 # stays clean whether it is read in Windows Terminal, old conhost, or a text file.
 if (-not (Test-Path $LogFolder)) { New-Item -Path $LogFolder -ItemType Directory -Force | Out-Null }
-$log = Join-Path $LogFolder "runupdates_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+$log = Join-Path $LogFolder "WindowsMaintenance_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
 Start-Transcript -Path $log | Out-Null
 
 try {

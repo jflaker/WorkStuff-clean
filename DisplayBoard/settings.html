@@ -100,7 +100,7 @@
     <div class="card">
       <strong>After saving</strong>
       <ol>
-        <li>Put <code>config.json</code> in the <code>SlideShowExperiment</code> folder on the display PC.</li>
+        <li>Put <code>config.json</code> in the <code>DisplayBoard</code> folder on the display PC.</li>
         <li>On that PC run: <code>.\Apply-Config.ps1 -TriggerSync</code></li>
       </ol>
     </div>
@@ -181,7 +181,7 @@
     a.download = 'config.json';
     a.click();
     URL.revokeObjectURL(a.href);
-    show('Downloaded config.json. Copy into SlideShowExperiment, then run Apply-Config.ps1.', 'ok');
+    show('Downloaded config.json. Copy into DisplayBoard, then run Apply-Config.ps1.', 'ok');
   });
   $('saveBtn').addEventListener('click', async function () {
     var cfg = formToConfig();

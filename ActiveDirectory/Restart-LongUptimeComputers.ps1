@@ -14,13 +14,14 @@
     equivalent. If you need real idle time, enable PS Remoting and run a
     GetLastInputInfo probe with Invoke-Command.
 
-    Defaults to -WhatIf behaviour: it will NOT reboot anything unless you pass
-    -Confirm:$false explicitly.
+    ConfirmImpact is High, so each reboot prompts. Nothing restarts unless you
+    answer yes, or you pass -Confirm:$false. Pass -WhatIf to list the machines
+    and reboot none of them.
 
 .EXAMPLE
-    .\reboot30days.ps1                        # report only
+    .\Restart-LongUptimeComputers.ps1 -WhatIf
 .EXAMPLE
-    .\reboot30days.ps1 -Confirm:$false        # actually reboot
+    .\Restart-LongUptimeComputers.ps1 -Confirm:$false
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(

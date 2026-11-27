@@ -1,5 +1,23 @@
-# Reset-ADPassword.ps1
+#Requires -Version 5.1
+#Requires -Modules ActiveDirectory
+<#
+.SYNOPSIS
+    Unlocks an Active Directory account, or resets its password and unlocks it.
 
+.DESCRIPTION
+    Interactive menu. Option 1 builds a random 16-character temporary password,
+    sets it with "change at next logon", and unlocks the account. The password
+    is printed once. Option 2 only unlocks.
+
+    Type a SamAccountName, or pick one from a list of every user in the domain.
+    An answer other than 1 or 2, for the action or for how you enter the user,
+    is asked again. Nothing is changed until both answers are 1 or 2.
+    The account you run this as needs the right to reset that user's password
+    and to unlock the account.
+
+.EXAMPLE
+    .\ADUnlockReset.ps1
+#>
 function Get-RandomPassword {
     <#
         Cryptographically random password with at least one character from each class.
@@ -43,13 +61,25 @@ $options = @{
     2 = "Unlock account only"
 }
 
-# Display menu options and prompt user to select one
-Write-Host "Select an option:"
-$options.GetEnumerator() | ForEach-Object {Write-Host "$($_.Key): $($_.Value)"}
-$option = Read-Host "Enter the number of the option you want to use."
+# Re-prompt until the choice is 1 or 2. `break` here is outside any loop and
+# throws in Windows PowerShell 5.1 ("The break statement is not valid...").
+do {
+    Write-Host "Select an option:"
+    $options.GetEnumerator() | ForEach-Object {Write-Host "$($_.Key): $($_.Value)"}
+    $option = Read-Host "Enter the number of the option you want to use."
+    if ($option -ne "1" -and $option -ne "2") {
+        Write-Host "Invalid input. Please try again."
+        Write-Host ""
+    }
+} until ($option -eq "1" -or $option -eq "2")
 
-# Prompt user to select how to input users
-$userInput = Read-Host "How do you want to input users? Type '1' to select from a list, or type '2' to type them in."
+do {
+    $userInput = Read-Host "How do you want to input users? Type '1' to select from a list, or type '2' to type them in."
+    if ($userInput -ne "1" -and $userInput -ne "2") {
+        Write-Host "Invalid input. Please try again."
+        Write-Host ""
+    }
+} until ($userInput -eq "1" -or $userInput -eq "2")
 
 if ($userInput -eq "1") {
     # Populate a list of users to select from
@@ -64,9 +94,6 @@ if ($userInput -eq "1") {
 } elseif ($userInput -eq "2") {
     # Prompt user to input username
     $userName = Read-Host "Enter the name of the user you want to reset the password for."
-} else {
-    Write-Host "Invalid input. Please try again."
-    break
 }
 
 if ($option -eq "1") {
@@ -90,7 +117,4 @@ if ($option -eq "1") {
 
     Write-Host ""
     Write-Host "Account for user $userName has been unlocked."
-} else {
-    Write-Host "Invalid input. Please try again."
-    break
 }

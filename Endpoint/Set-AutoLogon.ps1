@@ -1,3 +1,4 @@
+#Requires -Version 5.1
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
@@ -18,11 +19,11 @@
     low-privilege account that has no access to anything else.
 
 .EXAMPLE
-    .\setautologin.ps1 -Show
+    .\Set-AutoLogon.ps1 -Show
 .EXAMPLE
-    .\setautologin.ps1 -Enable
+    .\Set-AutoLogon.ps1 -Enable
 .EXAMPLE
-    .\setautologin.ps1 -Disable -WhatIf
+    .\Set-AutoLogon.ps1 -Disable -WhatIf
 #>
 [CmdletBinding(DefaultParameterSetName = 'Show', SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
