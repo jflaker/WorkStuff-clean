@@ -40,14 +40,14 @@ function Get-UserChoice {
     return [int]$choice
 }
 
-function Execute-UtilityScript {
+function Invoke-UtilityScript {
     param (
         [string]$scriptPath
     )
     . $scriptPath
 }
 
-function Load-UtilityScripts {
+function Import-UtilityScripts {
     param (
         [string]$csvFilePath
     )
@@ -77,14 +77,14 @@ if (-Not (Test-Path -Path $csvFilePath)) {
 }
 
 # Load utility scripts from CSV
-$utilityScripts = Load-UtilityScripts -csvFilePath $csvFilePath
+$utilityScripts = Import-UtilityScripts -csvFilePath $csvFilePath
 
 # Main menu loop
 do {
     Show-Menu -menuItems $utilityScripts
     $choice = Get-UserChoice -maxChoice $utilityScripts.Length
     if ($choice -gt 0) {
-        Execute-UtilityScript -scriptPath $utilityScripts[$choice - 1].Path
+        Invoke-UtilityScript -scriptPath $utilityScripts[$choice - 1].Path
     }
 } while ($choice -ne 0)
 
