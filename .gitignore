@@ -1,15 +1,21 @@
-# Windows Explorer cruft
+# Windows Explorer and editor cruft
 desktop.ini
 Thumbs.db
+.DS_Store
 *.url
+*.bak
+*.tmp
+*~
+*.orig
 
-# Generated reports -- these contain real account names, machine names and AD data.
-# Never commit them. Scripts here write to Documents\ADReports by default.
+# Generated reports. These contain real account names, machine names, and AD data.
+# AD scripts write to Documents\ADReports by default. Do not commit them.
 *.xlsx
 *.xls
 *.csv
-!Scripts/drives.csv
-!Scripts/departments.csv
+!Endpoint/departments.csv
+!Utilities/drives.csv
+!Utilities/santas.example.csv
 
 # Local / environment-specific data
 drives.local.csv
@@ -19,8 +25,8 @@ santas.csv
 # Output
 *.log
 
-# Display board runtime artifacts
-SlideShowExperiment/playlist.js
-SlideShowExperiment/sync.log
-SlideShowExperiment/images/
-SlideShowExperiment/config.js
+# Display board runtime artifacts (built on the kiosk PC)
+DisplayBoard/playlist.js
+DisplayBoard/sync.log
+DisplayBoard/images/
+DisplayBoard/config.js

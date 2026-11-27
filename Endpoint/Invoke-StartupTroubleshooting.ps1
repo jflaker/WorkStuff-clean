@@ -1,3 +1,4 @@
+#Requires -Version 5.1
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
@@ -20,9 +21,9 @@
       * Everything is transcripted to a log file instead of scrolling past.
 
 .EXAMPLE
-    .\troubleshoot.ps1
+    .\Invoke-StartupTroubleshooting.ps1
 .EXAMPLE
-    .\troubleshoot.ps1 -RunChkdsk -EnableBootLog
+    .\Invoke-StartupTroubleshooting.ps1 -RunChkdsk -EnableBootLog
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(

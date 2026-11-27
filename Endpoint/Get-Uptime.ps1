@@ -33,10 +33,10 @@
     Emulate `uptime -s` (boot time, yyyy-MM-dd HH:mm:ss).
 
 .EXAMPLE
-    .\UPTIME.ps1
+    .\Get-Uptime.ps1
 .EXAMPLE
     # From a Linux box over SSH: read the 1-minute load
-    .\UPTIME.ps1 -LoadAvg | awk '{print $1}'
+    .\Get-Uptime.ps1 -LoadAvg | awk '{print $1}'
 #>
 [CmdletBinding(DefaultParameterSetName = 'Full')]
 param(

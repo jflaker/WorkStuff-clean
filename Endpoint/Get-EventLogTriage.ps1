@@ -32,11 +32,11 @@
     One or more targets. Omit to run against the local machine.
 
 .EXAMPLE
-    .\CheckLogs.ps1 -ComputerName PC-104
+    .\Get-EventLogTriage.ps1 -ComputerName PC-104
 .EXAMPLE
-    .\CheckLogs.ps1 -ComputerName PC-104,PC-105,PC-106 -Days 7
+    .\Get-EventLogTriage.ps1 -ComputerName PC-104,PC-105,PC-106 -Days 7
 .EXAMPLE
-    .\CheckLogs.ps1 -ComputerName (Get-Content .\machines.txt) -Credential (Get-Credential)
+    .\Get-EventLogTriage.ps1 -ComputerName (Get-Content .\machines.txt) -Credential (Get-Credential)
 #>
 [CmdletBinding()]
 param(

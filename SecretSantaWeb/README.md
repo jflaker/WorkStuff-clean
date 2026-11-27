@@ -4,7 +4,7 @@ One HTML file. It runs in the browser. There is no server, no account, and nothi
 
 Open it by double-clicking [index.html](index.html).
 
-The PowerShell version, which can also write a file or send mail, is [Scripts/SecretSanta.ps1](../Scripts/SecretSanta.ps1).
+The PowerShell version, which can also write a file or send mail, is [Utilities/SecretSanta.ps1](../Utilities/SecretSanta.ps1). That script requires an Email value on every row. This page allows a blank email, and it can record exclusion pairs (two people who must not draw each other). The PowerShell script has no exclusion list.
 
 ## What it does
 
@@ -17,11 +17,11 @@ The PowerShell version, which can also write a file or send mail, is [Scripts/Se
 ## Privacy
 
 - Data stays in this browser tab. Refreshing the page clears it.
-- Do not leave the Full list on a shared screen while people are still revealing.
+- Close the full list before handing the machine to someone who is about to reveal their name.
 
 ## CSV
 
-Same columns as `Scripts/santas.example.csv`:
+Same columns as `Utilities/santas.example.csv`:
 
 ```csv
 Name,Email
