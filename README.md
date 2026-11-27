@@ -40,7 +40,7 @@ Run from `ActiveDirectory/`. Workbooks and the reboot problem list go to `Docume
 | `ADLastLogin.ps1` | Excel workbook, sheets USERS and COMPUTERS. Last logon comes from `LastLogonTimestamp` (replicated about every 9–14 days, so it can lag). Empty values are written as `Never Logged On`. |
 | `ADOldUsersComp.ps1` | Users and computers whose `LastLogonDate` is older than `-Days` (default 90). Objects that have never logged on are counted on screen and omitted from the workbook. Email is sent only when `-MailTo`, `-MailFrom`, and `-SmtpServer` are all set. |
 | `ADShowDisableLocked.ps1` | Prints locked accounts and disabled accounts. Screen only. |
-| `ADUnlockReset.ps1` | Menu. Option 1 sets a random 16-character password, requires a change at next logon, and unlocks. Option 2 unlocks only. The temporary password is printed once. You can type a SamAccountName or pick from every user in the domain. |
+| `ADUnlockReset.ps1` | Menu. Option 1 sets a random 16-character password, requires a change at next logon, and unlocks. Option 2 unlocks only. Any other answer is asked again. The temporary password is printed once. You can type a SamAccountName or pick from every user in the domain. |
 | `Restart-LongUptimeComputers.ps1` | Domain computers whose uptime is greater than `-UptimeDays` (default 30) and whose `Win32_ComputerSystem.UserName` is empty. ConfirmImpact is High, so each reboot prompts. `-WhatIf` lists them and reboots nothing. `-Confirm:$false` reboots without prompts. Outside weekends and weekdays after 18:00 the script returns immediately unless you pass `-IgnoreSchedule`. Machines that fail ping or CIM are written to a timestamped CSV. |
 
 ```powershell
